@@ -1,0 +1,2134 @@
+<?php
+// ============================================================================
+// ARCHITECTURE: Enterprise Guest Discovery & Screening Engine (All-In-One File)
+// FILE: guest_dashboard/guest_portal.php
+// CONTAINS: Dynamic Profile Dropdown, Unified Routing, Responsive Architecture
+// ============================================================================
+session_start();
+
+$isLoggedIn = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+
+$sessionUser = [
+    'is_logged_in' => $isLoggedIn,
+    'user_id'      => $isLoggedIn ? $_SESSION['user_id'] : null,
+    'full_name'    => $isLoggedIn ? ($_SESSION['full_name'] ?? 'Authorized Resident') : 'Guest Visitor',
+    'email'        => $isLoggedIn ? ($_SESSION['email'] ?? 'guest@greenview.internal') : 'Not Signed In',
+    'phone'        => $isLoggedIn ? ($_SESSION['phone_number'] ?? '') : '',
+    'role_id'      => $isLoggedIn ? ($_SESSION['role_id'] ?? 1) : 1,
+    'role_name'    => $isLoggedIn ? ($_SESSION['role_name'] ?? 'RESIDENT') : 'GUEST'
+];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Greenview Heights — Enterprise Society Discovery Portal</title>
+
+  <!-- Typography & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* ==========================================================================
+       1. COMPLETE EMBEDDED ENTERPRISE CSS SYSTEM
+       ========================================================================== */
+    :root {
+      --bg-canvas: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-alt: #f1f5f9;
+      --bg-glass: rgba(255, 255, 255, 0.94);
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      --text-main: #090d16;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --text-invert: #ffffff;
+
+      --primary: #0f172a;
+      --primary-accent: #2563eb;
+      --primary-accent-hover: #1d4ed8;
+      --primary-accent-soft: #eff6ff;
+
+      --emerald: #10b981;
+      --emerald-soft: #ecfdf5;
+      --amber: #f59e0b;
+      --amber-soft: #fffbeb;
+      --rose: #ef4444;
+      --rose-soft: #fef2f2;
+      --indigo: #6366f1;
+
+      --radius-xs: 6px;
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+
+      --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 20px 35px -8px rgba(15, 23, 42, 0.12);
+
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --transition-smooth: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090d16 !important;
+      --bg-surface: #111827 !important;
+      --bg-surface-alt: #1a2234 !important;
+      --bg-glass: rgba(17, 24, 39, 0.94) !important;
+      --border-subtle: #1f2937 !important;
+      --border-strong: #374151 !important;
+
+      --text-main: #f8fafc !important;
+      --text-secondary: #cbd5e1 !important;
+      --text-muted: #94a3b8 !important;
+      --text-invert: #090d16 !important;
+
+      --primary: #f8fafc !important;
+      --primary-accent: #3b82f6 !important;
+      --primary-accent-hover: #60a5fa !important;
+      --primary-accent-soft: rgba(59, 130, 246, 0.15) !important;
+
+      --emerald-soft: rgba(16, 185, 129, 0.15);
+      --amber-soft: rgba(245, 158, 11, 0.15);
+      --rose-soft: rgba(239, 68, 68, 0.15);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 20px;
+      width: 100%;
+    }
+
+    /* TOP NAVIGATION */
+    .app-nav {
+      position: sticky;
+      top: 0;
+      z-index: 500;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-container {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .brand-symbol {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .nav-tabs-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      list-style: none;
+      background: var(--bg-surface-alt);
+      padding: 5px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .nav-tab-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .nav-tab-link:hover { color: var(--text-main); }
+    .nav-tab-link.active {
+      background: var(--bg-surface);
+      color: var(--primary-accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-actions-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+    }
+
+    .theme-trigger-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .theme-trigger-btn:hover {
+      background: var(--border-subtle);
+      color: var(--primary-accent);
+    }
+
+    /* PROFILE DROPDOWN COMPONENT */
+    .profile-dropdown-wrapper {
+      position: relative;
+    }
+
+    .profile-circle-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: <?= $sessionUser['is_logged_in'] ? 'var(--primary-accent)' : 'var(--bg-surface-alt)' ?>;
+      color: <?= $sessionUser['is_logged_in'] ? '#ffffff' : 'var(--text-main)' ?>;
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--border-subtle);
+      cursor: pointer;
+      box-shadow: var(--shadow-xs);
+      transition: var(--transition-smooth);
+    }
+
+    .profile-circle-btn:hover {
+      transform: scale(1.05);
+      border-color: var(--primary-accent);
+    }
+
+    .profile-flyout-card {
+      position: absolute;
+      top: calc(100% + 14px);
+      right: 0;
+      width: 270px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 600;
+      animation: flyoutFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .profile-flyout-card.active { display: flex; }
+
+    @keyframes flyoutFade {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .flyout-user-meta {
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .flyout-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .flyout-email {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .flyout-role-badge {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      background: var(--primary-accent-soft);
+      color: var(--primary-accent);
+      text-transform: uppercase;
+    }
+
+    .flyout-menu-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .flyout-menu-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius-xs);
+      color: var(--text-main);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      text-align: left;
+      width: 100%;
+      transition: var(--transition-smooth);
+    }
+
+    .flyout-menu-link:hover {
+      background: var(--bg-surface-alt);
+      color: var(--primary-accent);
+    }
+
+    .flyout-menu-link.logout-link {
+      color: var(--rose);
+      border-top: 1px solid var(--border-subtle);
+      margin-top: 4px;
+      padding-top: 10px;
+    }
+    .flyout-menu-link.logout-link:hover {
+      background: var(--rose-soft);
+      color: var(--rose);
+    }
+
+    /* VIEW PANES */
+    .view-pane {
+      display: none;
+      padding: 36px 0 80px;
+      animation: fadeInView 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .view-pane.active { display: block; }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* HERO */
+    .hero-view {
+      padding: 48px 0 32px;
+      background: radial-gradient(circle at 10% 20%, var(--primary-accent-soft) 0%, transparent 40%);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 36px;
+    }
+
+    .hero-split {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      background: var(--emerald-soft);
+      color: var(--emerald);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .hero-headline {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.18;
+      margin-bottom: 14px;
+    }
+    .hero-headline span { color: var(--primary-accent); }
+
+    .hero-subparagraph {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      max-width: 560px;
+    }
+
+    .hero-telemetry-cluster {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .telemetry-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .telemetry-val {
+      font-size: 22px;
+      font-weight: 800;
+      display: block;
+      color: var(--text-main);
+    }
+
+    .telemetry-lbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .hero-poster-frame {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .hero-poster-img {
+      width: 100%;
+      height: 360px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .poster-caption-glass {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title-wrap {
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .section-main-heading { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+    .section-caption-muted { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
+    /* FILTERS */
+    .units-filter-strip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr auto;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .filter-field { display: flex; flex-direction: column; gap: 5px; }
+    .filter-field label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); }
+
+    .filter-input-element {
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xs);
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      width: 100%;
+    }
+    .filter-input-element:focus {
+      border-color: var(--primary-accent);
+      background: var(--bg-surface);
+    }
+
+    /* CARDS */
+    .flats-deck-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 24px;
+    }
+
+    .flat-inventory-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      transition: var(--transition-smooth);
+    }
+    .flat-inventory-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+
+    .flat-card-viewport {
+      height: 220px;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-surface-alt);
+    }
+
+    .flat-card-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+    .flat-inventory-card:hover .flat-card-photo { transform: scale(1.04); }
+
+    .floating-type-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .floating-type-badge.rent { background: var(--primary-accent); }
+    .floating-type-badge.sale { background: var(--emerald); }
+
+    .flat-card-content {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .flat-card-heading { font-size: 19px; font-weight: 800; margin-bottom: 4px; }
+    .flat-card-address { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+
+    .flat-attributes-matrix {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 18px;
+    }
+    .matrix-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+
+    .financial-primary-sum { font-size: 24px; font-weight: 800; color: var(--primary-accent); margin-bottom: 18px; }
+    .financial-primary-sum span { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+
+    /* DETAIL & PROFILE PANELS */
+    .breadcrumbs-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 22px;
+    }
+    .breadcrumbs-strip a { color: var(--text-main); text-decoration: none; cursor: pointer; }
+
+    .detail-hero-layout {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    .gallery-deck-main {
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      height: 420px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 24px;
+    }
+    .gallery-deck-main img { width: 100%; height: 100%; object-fit: cover; }
+
+    .spec-sheet-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 28px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .spec-sheet-panel h2 { font-size: 19px; font-weight: 800; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+
+    .key-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .metric-data-card {
+      background: var(--bg-surface-alt);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      border: 1px solid var(--border-subtle);
+    }
+    .metric-data-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); }
+    .metric-data-value { font-size: 17px; font-weight: 800; margin-top: 3px; display: block; }
+
+    .itemized-ledger-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 13.5px; }
+    .itemized-ledger-table td { padding: 11px 0; border-bottom: 1px solid var(--border-subtle); }
+    .itemized-ledger-table tr:last-child td { border-bottom: none; font-weight: 800; font-size: 15px; padding-top: 14px; }
+
+    .sticky-booking-card {
+      position: sticky;
+      top: 92px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .booking-sidebar-price { font-size: 30px; font-weight: 800; color: var(--primary-accent); margin-bottom: 4px; }
+    .booking-feature-tags { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 22px; font-size: 13px; }
+    .booking-feature-tags li { display: flex; align-items: center; gap: 10px; list-style: none; }
+
+    /* CLEARANCE PASS */
+    .confirmation-viewport { max-width: 800px; margin: 0 auto; }
+    .clearance-slip-master {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      border-top: 6px solid var(--primary-accent);
+    }
+    .slip-header-brand {
+      background: #0f172a;
+      color: #fff;
+      padding: 22px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .slip-body-pad { padding: 32px 28px; display: flex; flex-direction: column; gap: 24px; }
+
+    .token-showcase-box {
+      background: var(--primary-accent-soft);
+      border: 2px dashed var(--primary-accent);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      text-align: center;
+    }
+    .token-sub-caption { font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--primary-accent); }
+    .token-large-digits { font-family: var(--font-mono); font-size: 42px; font-weight: 800; letter-spacing: 8px; color: var(--primary-accent); margin: 6px 0; }
+
+    .guard-dispatch-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      background: var(--bg-surface-alt);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      border: 1px solid var(--border-subtle);
+    }
+    .contact-cell-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); }
+    .contact-cell-desc { font-size: 14px; font-weight: 800; margin-top: 2px; }
+
+    /* PROFILE PANE */
+    .profile-hero-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow-sm);
+      flex-wrap: wrap;
+    }
+
+    .profile-avatar-large {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--primary-accent) 0%, #1e40af 100%);
+      color: #fff;
+      font-size: 24px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+
+    .kyc-badge-pill {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--emerald-soft);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .role-identity-chip {
+      background: var(--primary-accent-soft);
+      color: var(--primary-accent);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: var(--radius-xs);
+    }
+
+    .profile-tabs-dock {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface-alt);
+      padding: 5px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 22px;
+      overflow-x: auto;
+    }
+
+    .profile-subtab-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: var(--radius-xs);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      white-space: nowrap;
+    }
+    .profile-subtab-btn.active {
+      background: var(--bg-surface);
+      color: var(--primary-accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .profile-pane-content { display: none; }
+    .profile-pane-content.active { display: block; }
+    .profile-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+
+    /* AMENITIES & OFFICE */
+    .amenities-hero-overview {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      margin-bottom: 32px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .amenities-grid-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px; }
+    .amenity-detail-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+    .amenity-photo-box { height: 190px; }
+    .amenity-photo-img { width: 100%; height: 100%; object-fit: cover; }
+    .amenity-card-body { padding: 22px; }
+    .amenity-schedule-strip { display: flex; justify-content: space-between; padding: 9px 12px; background: var(--bg-surface-alt); border-radius: var(--radius-xs); font-size: 12px; font-weight: 700; margin-top: 12px; }
+
+    .office-quad-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 28px; }
+    .office-panel { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 22px; }
+    .panel-inner-title { font-size: 17px; font-weight: 800; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    .committee-roster-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .committee-profile-unit { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-surface-alt); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); }
+    .committee-avatar { width: 40px; height: 40px; border-radius: var(--radius-full); background: var(--indigo); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+    .inquiry-composer-form { display: flex; flex-direction: column; gap: 14px; }
+
+    /* BUTTONS & MODALS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 18px;
+      border-radius: var(--radius-xs);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: var(--transition-smooth);
+    }
+    .btn-brand { background: var(--primary-accent); color: #fff; }
+    .btn-brand:hover { background: var(--primary-accent-hover); }
+    .btn-emerald { background: var(--emerald); color: #fff; }
+    .btn-outline { background: transparent; border-color: var(--border-subtle); color: var(--text-main); }
+    .btn-outline:hover { background: var(--bg-surface-alt); }
+    .btn-dark { background: #0f172a; color: #fff; }
+    .btn-block { width: 100%; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .modal-backdrop.active { display: flex !important; }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      max-width: 460px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+      overflow: hidden;
+    }
+    .modal-header { padding: 18px 22px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; }
+    .modal-form { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+
+    .filter-ctrl { display: flex; flex-direction: column; gap: 4px; }
+    .filter-ctrl label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); }
+    .input-box { background: var(--bg-surface-alt); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); padding: 10px 14px; font-family: inherit; font-size: 13px; color: var(--text-main); outline: none; width: 100%; }
+
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-lg);
+      z-index: 2000;
+    }
+    .toast-pill.active { display: flex; }
+
+    /* MOBILE DOCK & RESPONSIVE BREAKPOINTS */
+    .mobile-bottom-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 400;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px;
+    }
+
+    .mobile-dock-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+      padding: 6px 0;
+    }
+
+    .mobile-dock-btn.active { color: var(--primary-accent); }
+
+    @media print {
+      body * { visibility: hidden; }
+      .clearance-slip-master, .clearance-slip-master * { visibility: visible; }
+      .clearance-slip-master { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+    }
+
+    @media (max-width: 992px) {
+      .detail-hero-layout { grid-template-columns: 1fr; }
+      .units-filter-strip { grid-template-columns: 1fr 1fr; }
+      .office-quad-grid { grid-template-columns: 1fr; }
+      .hero-split { grid-template-columns: 1fr; }
+      .nav-tabs-group { display: none; }
+      .mobile-bottom-bar { display: flex; }
+      body { padding-bottom: 70px; }
+    }
+
+    @media (max-width: 640px) {
+      .units-filter-strip { grid-template-columns: 1fr; }
+      .key-metrics-grid { grid-template-columns: 1fr; }
+      .guard-dispatch-grid { grid-template-columns: 1fr; }
+      .hero-headline { font-size: 28px; }
+      .profile-form-grid { grid-template-columns: 1fr; }
+      .hero-telemetry-cluster { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================
+       APPLICATION NAVIGATION DOCK
+       ======================================================================== -->
+  <header class="app-nav">
+    <div class="container nav-container">
+      
+      <!-- Brand Logo Left -->
+      <div class="brand-cluster" onclick="routeTo('catalog')">
+        <div class="brand-symbol">
+          <i data-lucide="building-2"></i>
+        </div>
+        <div class="brand-meta">
+          <span class="brand-title">Greenview Heights</span>
+        </div>
+      </div>
+
+      <!-- Center Navigation Tabs (Desktop) -->
+      <ul class="nav-tabs-group">
+        <li>
+          <button class="nav-tab-link active" id="tabNavCatalog" onclick="routeTo('catalog')">
+            <i data-lucide="home" style="width: 15px;"></i> Available Residences
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavAmenities" onclick="routeTo('amenities')">
+            <i data-lucide="sparkles" style="width: 15px;"></i> Amenities
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavOffice" onclick="routeTo('office')">
+            <i data-lucide="landmark" style="width: 15px;"></i> Society Office
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavPasses" onclick="openActivePassView()" style="display:none; color:var(--emerald);">
+            <i data-lucide="shield-check" style="width: 15px;"></i> Active Clearance Slip
+          </button>
+        </li>
+      </ul>
+
+      <!-- Right Controls Cluster: Theme Toggle + Profile Dropdown Hub -->
+      <div class="nav-actions-cluster">
+        
+        <!-- Dark/Light Mode Trigger -->
+        <button class="theme-trigger-btn" id="themeBtn" title="Toggle Display Theme" onclick="toggleThemeMode()">
+          <i data-lucide="moon" id="themeIcon"></i>
+        </button>
+
+        <!-- Clean Profile Circle & Dropdown Hub -->
+        <div class="profile-dropdown-wrapper" id="profileDropdownArea">
+          <button class="profile-circle-btn" id="profileCircleBtn" title="User Account Menu" onclick="toggleProfileDropdown()">
+            <?php if ($sessionUser['is_logged_in']): ?>
+              <?= strtoupper(substr($sessionUser['full_name'], 0, 1)) ?>
+            <?php else: ?>
+              <i data-lucide="user" style="width: 18px;"></i>
+            <?php endif; ?>
+          </button>
+
+          <!-- Modern Flyout Profile Card -->
+          <div class="profile-flyout-card" id="profileFlyoutMenu">
+            <?php if ($sessionUser['is_logged_in']): ?>
+              <!-- Logged In Identity Details -->
+              <div class="flyout-user-meta">
+                <div class="flyout-name"><?= htmlspecialchars($sessionUser['full_name']) ?></div>
+                <div class="flyout-email"><?= htmlspecialchars($sessionUser['email']) ?></div>
+                <span class="flyout-role-badge">ROLE: <?= htmlspecialchars($sessionUser['role_name']) ?></span>
+              </div>
+
+              <div class="flyout-menu-items">
+                <button class="flyout-menu-link" onclick="routeTo('profile'); closeProfileDropdown();">
+                  <i data-lucide="user-check" style="width: 16px;"></i> My Profile Vault
+                </button>
+                <button class="flyout-menu-link" onclick="openActivePassView(); closeProfileDropdown();">
+                  <i data-lucide="shield-check" style="width: 16px;"></i> Active Gate Pass
+                </button>
+                <a href="../auth/logout.php" class="flyout-menu-link logout-link">
+                  <i data-lucide="log-out" style="width: 16px;"></i> Sign Out
+                </a>
+              </div>
+            <?php else: ?>
+              <!-- Unauthenticated State Options -->
+              <div class="flyout-user-meta">
+                <div class="flyout-name">Guest Explorer</div>
+                <div class="flyout-email">Sign in to save passes & leases</div>
+              </div>
+
+              <div class="flyout-menu-items">
+                <a href="../auth/auth.php?mode=login" class="flyout-menu-link">
+                  <i data-lucide="log-in" style="width: 16px;"></i> Sign In
+                </a>
+                <a href="../auth/auth.php?mode=register" class="flyout-menu-link">
+                  <i data-lucide="user-plus" style="width: 16px;"></i> Create Account
+                </a>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Mobile Bottom Navigation Dock -->
+  <nav class="mobile-bottom-bar">
+    <button class="mobile-dock-btn active" id="mDockCatalog" onclick="routeTo('catalog')">
+      <i data-lucide="home" style="width: 18px;"></i>
+      <span>Residences</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockAmenities" onclick="routeTo('amenities')">
+      <i data-lucide="sparkles" style="width: 18px;"></i>
+      <span>Amenities</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockOffice" onclick="routeTo('office')">
+      <i data-lucide="landmark" style="width: 18px;"></i>
+      <span>Office</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockProfile" onclick="routeTo('profile')">
+      <i data-lucide="user" style="width: 18px;"></i>
+      <span>Account</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================
+       VIEW 1: RESIDENCES CATALOG (#view-catalog)
+       ======================================================================== -->
+  <main class="view-pane active" id="view-catalog">
+    <section class="hero-view">
+      <div class="container hero-split">
+        <div>
+          <div class="hero-tag">
+            <i data-lucide="verified" style="width: 14px;"></i> Official Society Real Estate Portal
+          </div>
+          <h1 class="hero-headline">
+            Experience smart residential living in <span>Chittagong</span>.
+          </h1>
+          <p class="hero-subparagraph">
+            Browse verified apartments, inspect itemized financial split-ledgers, view architectural amenities, and generate security viewing passes.
+          </p>
+
+          <div class="hero-telemetry-cluster">
+            <div class="telemetry-card">
+              <span class="telemetry-val" id="telemetryFlatsCount">0</span>
+              <span class="telemetry-lbl">Available Units</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-val">100%</span>
+              <span class="telemetry-lbl">Power Autonomy</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-val">24/7</span>
+              <span class="telemetry-lbl">Guarded Perimeter</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-poster-frame">
+          <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80" class="hero-poster-img" alt="Greenview Towers">
+          <div class="poster-caption-glass">
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">Towers Block-A & Block-B</div>
+              <div style="font-size: 12px; opacity: 0.8;">South-Facing &bull; Natural Airway Design</div>
+            </div>
+            <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: var(--radius-full);">Verified Title</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="section-title-wrap">
+        <div>
+          <h2 class="section-main-heading">Available Residences</h2>
+          <p class="section-caption-muted">Verified residential units available for immediate lease agreements or capital deed acquisitions.</p>
+        </div>
+      </div>
+
+      <!-- Advanced Filter Engine -->
+      <div class="units-filter-strip">
+        <div class="filter-field">
+          <label><i data-lucide="search" style="width: 12px; vertical-align: middle;"></i> Search Query</label>
+          <input type="text" id="srchQuery" class="filter-input-element" placeholder="Search unit, floor, or block...">
+        </div>
+        <div class="filter-field">
+          <label>Listing Mode</label>
+          <select id="srchMode" class="filter-input-element">
+            <option value="ALL">All Categories</option>
+            <option value="RENT">Rent Only</option>
+            <option value="SALE">Sale Deed Only</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Tower Block</label>
+          <select id="srchBlock" class="filter-input-element">
+            <option value="ALL">All Towers</option>
+            <option value="Block-A">Block-A (Executive)</option>
+            <option value="Block-B">Block-B (Greenview)</option>
+            <option value="Block-C">Block-C (Premium)</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Budget Limit</label>
+          <select id="srchBudget" class="filter-input-element">
+            <option value="ALL">No Cap</option>
+            <option value="30000">Under ৳ 30,000 / mo</option>
+            <option value="50000">Under ৳ 50,000 / mo</option>
+            <option value="15000000">Under ৳ 1.50 Crore</option>
+          </select>
+        </div>
+        <div>
+          <button class="btn btn-outline" id="srchResetBtn" style="height: 38px; margin-top: 18px;">
+            <i data-lucide="rotate-ccw"></i> Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Catalog Cards Deck -->
+      <div class="flats-deck-grid" id="catalogFlatsDeck">
+        <!-- Live Data loaded via Fetch -->
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 2A: DEDICATED RENT SPECIFICATIONS (#view-rent-details)
+       ======================================================================== -->
+  <main class="view-pane" id="view-rent-details">
+    <div class="container">
+      <div class="breadcrumbs-strip">
+        <a onclick="routeTo('catalog')"><i data-lucide="arrow-left" style="width:14px; vertical-align:middle;"></i> Back to Residences</a>
+        <span>/</span>
+        <span id="rentBreadcrumbUnit">Unit A-401</span>
+        <span>/</span>
+        <span>Rental Agreement Specifications</span>
+      </div>
+
+      <div class="detail-hero-layout">
+        <div>
+          <div class="gallery-deck-main">
+            <img id="rentDetailHeroImg" src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80" alt="Rental Flat View">
+          </div>
+
+          <div class="spec-sheet-panel">
+            <h2><i data-lucide="file-text" style="color:var(--primary-accent);"></i> Tenancy Terms & Readiness</h2>
+            
+            <div class="key-metrics-grid">
+              <div class="metric-data-card">
+                <span class="metric-data-label">Net Living Space</span>
+                <span class="metric-data-value" id="rentDetailSqft">0 sqft</span>
+              </div>
+              <div class="metric-data-card">
+                <span class="metric-data-label">Tenancy Tenure</span>
+                <span class="metric-data-value">12 Months (Renewable)</span>
+              </div>
+              <div class="metric-data-card">
+                <span class="metric-data-label">Handover State</span>
+                <span class="metric-data-value" style="color:var(--emerald);">Move-In Ready</span>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px; font-weight:800; margin-bottom:12px;">Monthly Financial Ledger (Split Billing)</h3>
+            <table class="itemized-ledger-table">
+              <tr>
+                <td style="color:var(--text-muted);">Net Apartment Monthly Rent</td>
+                <td style="text-align:right;" id="rentDetailBase">৳ 0</td>
+              </tr>
+              <tr>
+                <td style="color:var(--text-muted);">Society Maintenance & Security Surcharge</td>
+                <td style="text-align:right;" id="rentDetailService">৳ 0</td>
+              </tr>
+              <tr>
+                <td style="color:var(--text-muted);">Estimated Sub-Metered Utility Quota</td>
+                <td style="text-align:right;" id="rentDetailUtility">৳ 0</td>
+              </tr>
+              <tr>
+                <td style="color:var(--text-muted);">Refundable Tenancy Deposit (2 Months)</td>
+                <td style="text-align:right;" id="rentDetailDeposit">৳ 0</td>
+              </tr>
+              <tr>
+                <td>Total Initial Move-in Commitment</td>
+                <td style="text-align:right; color:var(--primary-accent);" id="rentDetailTotal">৳ 0</td>
+              </tr>
+            </table>
+
+            <div style="background:var(--bg-surface-alt); padding:16px; border-radius:var(--radius-sm); font-size:13px; color:var(--text-muted);">
+              <i data-lucide="shield-alert" style="width:14px; vertical-align:middle; margin-right:4px;"></i>
+              Tenancy binds under standard society bylaws. FCFS atomic locking ensures reservations remain protected during landlord review.
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Reservation Sidebar -->
+        <aside class="sticky-booking-card">
+          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--primary-accent);">Verified Tenancy Lease</span>
+          <div class="booking-sidebar-price" id="rentSidebarPrice">৳ 0 <span>/ mo</span></div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:16px;" id="rentSidebarServiceCaption">+ Service Charge</div>
+
+          <ul class="booking-feature-tags">
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> First-Come-First-Served Priority</li>
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> Sub-metered Generator Backup</li>
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> Verified Landlord Deed on File</li>
+          </ul>
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn btn-brand btn-block" onclick="openViewingModal()">
+              <i data-lucide="calendar"></i> Schedule Physical Viewing
+            </button>
+            <a href="../auth/auth.php?mode=login" class="btn btn-outline btn-block">
+              <i data-lucide="lock"></i> Submit FCFS Lease Claim
+            </a>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 2B: DEDICATED BUY SPECIFICATIONS (#view-buy-details)
+       ======================================================================== -->
+  <main class="view-pane" id="view-buy-details">
+    <div class="container">
+      <div class="breadcrumbs-strip">
+        <a onclick="routeTo('catalog')"><i data-lucide="arrow-left" style="width:14px; vertical-align:middle;"></i> Back to Residences</a>
+        <span>/</span>
+        <span id="buyBreadcrumbUnit">Unit B-202</span>
+        <span>/</span>
+        <span>Purchase Deed & Asset Valuation</span>
+      </div>
+
+      <div class="detail-hero-layout">
+        <div>
+          <div class="gallery-deck-main">
+            <img id="buyDetailHeroImg" src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80" alt="Purchase Flat View">
+          </div>
+
+          <div class="spec-sheet-panel">
+            <h2><i data-lucide="landmark" style="color:var(--emerald);"></i> Asset Valuation & Ownership Rights</h2>
+            
+            <div class="key-metrics-grid">
+              <div class="metric-data-card">
+                <span class="metric-data-label">Gross Architectural Area</span>
+                <span class="metric-data-value" id="buyDetailSqft">0 sqft</span>
+              </div>
+              <div class="metric-data-card">
+                <span class="metric-data-label">Holding Tax Clearance</span>
+                <span class="metric-data-value" style="color:var(--emerald);" id="buyDetailHoldingTax">Audited & Paid</span>
+              </div>
+              <div class="metric-data-card">
+                <span class="metric-data-label">Mortgage Eligibility</span>
+                <span class="metric-data-value">All Commercial Banks</span>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px; font-weight:800; margin-bottom:12px;">Capital Acquisition Breakdown</h3>
+            <table class="itemized-ledger-table">
+              <tr>
+                <td style="color:var(--text-muted);">Declared Valuation</td>
+                <td style="text-align:right;" id="buyDetailPrice">৳ 0</td>
+              </tr>
+              <tr>
+                <td style="color:var(--text-muted);">Society Sinking Reserve Fund Contribution</td>
+                <td style="text-align:right;">৳ 2,00,000</td>
+              </tr>
+              <tr>
+                <td style="color:var(--text-muted);">Deeded Basement RFID Parking Bay</td>
+                <td style="text-align:right;">Included (Slot #P-12)</td>
+              </tr>
+              <tr>
+                <td>Earnest Money Downpayment (10%)</td>
+                <td style="text-align:right; color:var(--emerald);" id="buyDetailDownpayment">৳ 0</td>
+              </tr>
+            </table>
+
+            <div style="background:var(--bg-surface-alt); padding:16px; border-radius:var(--radius-sm); font-size:13px; color:var(--text-muted);">
+              <i data-lucide="badge-check" style="width:14px; vertical-align:middle; margin-right:4px; color:var(--emerald);"></i>
+              Original deed verified by Society Managing Committee. Direct transfer of title upon registration clearance.
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Purchase Sidebar -->
+        <aside class="sticky-booking-card">
+          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--emerald);">Permanent Ownership Sale</span>
+          <div class="booking-sidebar-price" style="color:var(--emerald);" id="buySidebarPrice">৳ 0 Cr</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Fixed Asset Purchase</div>
+
+          <ul class="booking-feature-tags">
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> Clear Sub-Registry Title</li>
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> Committee Legal Clearance</li>
+            <li><i data-lucide="check-circle-2" style="color:var(--emerald); width:16px;"></i> Assigned RFID Vehicle Bay</li>
+          </ul>
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn btn-emerald btn-block" onclick="openViewingModal()">
+              <i data-lucide="calendar"></i> Schedule Physical Viewing
+            </button>
+            <a href="../auth/auth.php?mode=login" class="btn btn-outline btn-block">
+              <i data-lucide="badge-check"></i> Initiate Deed Acquisition
+            </a>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 3: DEDICATED APPOINTMENT & CLEARANCE SLIP (#view-appointment-pass)
+       ======================================================================== -->
+  <main class="view-pane" id="view-appointment-pass">
+    <div class="container confirmation-viewport">
+      <div class="breadcrumbs-strip">
+        <a onclick="routeTo('catalog')"><i data-lucide="arrow-left" style="width:14px; vertical-align:middle;"></i> Return to Residences</a>
+        <span>/</span>
+        <span>Guarded Entrance Verification Slip</span>
+      </div>
+
+      <div class="clearance-slip-master">
+        <div class="slip-header-brand">
+          <div>
+            <div style="font-size:18px; font-weight:800;"><i data-lucide="shield-check" style="vertical-align:middle; margin-right:6px;"></i> Physical Inspection Clearance</div>
+            <div style="font-size:12px; opacity:0.8;">Single-Use Encrypted Ingress Pass &bull; Smart Society Terminal A</div>
+          </div>
+          <span style="font-size:11px; background:rgba(255,255,255,0.2); padding:4px 10px; border-radius:var(--radius-full);">STATUS: AUTHORIZED</span>
+        </div>
+
+        <div class="slip-body-pad">
+          <div class="token-showcase-box">
+            <span class="token-sub-caption">Entrance Reader Pass OTP</span>
+            <div class="token-large-digits" id="passOtpDigit">000-000</div>
+            <p style="font-size:12px; color:var(--text-muted);">Present this code verbally or show this digital pass to the on-duty guard at the security barrier.</p>
+          </div>
+
+          <div class="guard-dispatch-grid">
+            <div>
+              <span class="contact-cell-title">Target Unit</span>
+              <div class="contact-cell-desc" id="passUnitTarget">-</div>
+            </div>
+            <div>
+              <span class="contact-cell-title">Inspection Schedule</span>
+              <div class="contact-cell-desc" id="passScheduleWindow">-</div>
+            </div>
+            <div>
+              <span class="contact-cell-title">Authorized Terminal</span>
+              <div class="contact-cell-desc">Gate Terminal A (Visitor Bay)</div>
+            </div>
+            <div>
+              <span class="contact-cell-title">Party Allowance</span>
+              <div class="contact-cell-desc" id="passPartyAllowance">2 Persons Maximum</div>
+            </div>
+          </div>
+
+          <div style="background:var(--bg-surface-alt); border-radius:var(--radius-sm); padding:20px; border:1px solid var(--border-subtle);">
+            <h4 style="font-size:14px; font-weight:800; margin-bottom:12px;"><i data-lucide="phone-call" style="width:14px; vertical-align:middle;"></i> On-Site Escort & Contacts</h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:13px;">
+              <div>
+                <span style="color:var(--text-muted); display:block; font-size:11px; font-weight:700;">DUTY SECURITY COMMAND</span>
+                <strong id="passGuardContact">+880 1819-001122 (Desk A)</strong>
+              </div>
+              <div>
+                <span style="color:var(--text-muted); display:block; font-size:11px; font-weight:700;">FLAT OWNER / ESCORT</span>
+                <strong id="passOwnerContact">-</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <button class="btn btn-outline btn-sm" onclick="window.print()">
+              <i data-lucide="printer"></i> Print Ingress Slip
+            </button>
+            <button class="btn btn-brand btn-sm" onclick="routeTo('catalog')">
+              <i data-lucide="compass"></i> Explore Additional Flats
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 4: AMENITIES (#view-amenities)
+       ======================================================================== -->
+  <main class="view-pane" id="view-amenities">
+    <div class="container">
+      <div class="section-title-wrap">
+        <div>
+          <h2 class="section-main-heading">Neighborhood Facilities & Amenities</h2>
+          <p class="section-caption-muted">Maintained via monthly society service charges. Accessible to residents and inspected by guests.</p>
+        </div>
+      </div>
+
+      <div class="amenities-hero-overview">
+        <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">Society Infrastructure Standard</h3>
+        <p style="color: var(--text-muted); font-size: 14px;">
+          All society amenities are managed under automated slot concurrency locks (10-minute hold engine) to prevent booking collision. High-capacity CCTV coverage and RFID gate control protect all communal recreation grounds.
+        </p>
+      </div>
+
+      <div class="amenities-grid-deck">
+        <div class="amenity-detail-card">
+          <div class="amenity-photo-box">
+            <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600&auto=format&fit=crop&q=80" class="amenity-photo-img" alt="Gym">
+          </div>
+          <div class="amenity-card-body">
+            <h3 style="font-size: 18px; font-weight: 800;">Apex Fitness Center</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Olympic free weights, advanced cardio decks, and certified personal trainers.</p>
+            <div class="amenity-schedule-strip">
+              <span>Operational Slate</span>
+              <span style="color: var(--emerald);">06:00 AM – 10:30 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="amenity-detail-card">
+          <div class="amenity-photo-box">
+            <img src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&auto=format&fit=crop&q=80" class="amenity-photo-img" alt="Turf">
+          </div>
+          <div class="amenity-card-body">
+            <h3 style="font-size: 18px; font-weight: 800;">Skyview Futsal & Cricket Turf</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Floodlit artificial turf for badminton, cricket, and community tournaments.</p>
+            <div class="amenity-schedule-strip">
+              <span>Operational Slate</span>
+              <span style="color: var(--emerald);">03:00 PM – 11:00 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="amenity-detail-card">
+          <div class="amenity-photo-box">
+            <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?w=600&auto=format&fit=crop&q=80" class="amenity-photo-img" alt="Hall">
+          </div>
+          <div class="amenity-card-body">
+            <h3 style="font-size: 18px; font-weight: 800;">Majestic Community Banquet</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Air-conditioned banquet venue with catering prep kitchens for 250 seated guests.</p>
+            <div class="amenity-schedule-strip">
+              <span>Operational Slate</span>
+              <span>By Reservation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 5: SOCIETY OFFICE (#view-office)
+       ======================================================================== -->
+  <main class="view-pane" id="view-office">
+    <div class="container">
+      <div class="section-title-wrap">
+        <div>
+          <h2 class="section-main-heading">Society Managing Office</h2>
+          <p class="section-caption-muted">Governance, deed verification records, and public desk hours for prospective residents.</p>
+        </div>
+      </div>
+
+      <div class="office-quad-grid">
+        <div>
+          <div class="office-panel">
+            <div class="panel-inner-title">
+              <i data-lucide="users" style="color: var(--primary-accent);"></i> Elected Managing Committee
+            </div>
+            <div class="committee-roster-grid">
+              <div class="committee-profile-unit">
+                <div class="committee-avatar">P</div>
+                <div>
+                  <div style="font-weight: 800; font-size: 14px;">Engr. Mahmudul Hasan</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">President &bull; Block-A 601</div>
+                </div>
+              </div>
+              <div class="committee-profile-unit">
+                <div class="committee-avatar" style="background: var(--primary-accent);">T</div>
+                <div>
+                  <div style="font-weight: 800; font-size: 14px;">Zubaer Hossain, FCA</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Treasurer &bull; Block-B 402</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="office-panel">
+            <div class="panel-inner-title">
+              <i data-lucide="bell" style="color: var(--amber);"></i> Official Announcements
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="padding: 12px; background: var(--bg-surface-alt); border-radius: var(--radius-xs);">
+                <div style="font-weight: 700; font-size: 13px;">Society Annual General Meeting (AGM)</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Date: Next Friday, 07:30 PM &bull; Venue: Majestic Hall</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="office-panel">
+            <div class="panel-inner-title">
+              <i data-lucide="mail" style="color: var(--emerald);"></i> Contact Society Help Desk
+            </div>
+            <form class="inquiry-composer-form" onsubmit="handleInquirySubmit(event)">
+              <div class="filter-ctrl">
+                <label>Your Full Name *</label>
+                <input type="text" class="filter-input-element" value="<?= htmlspecialchars($sessionUser['full_name']) ?>" required>
+              </div>
+              <div class="filter-ctrl">
+                <label>Contact Phone Number *</label>
+                <input type="text" class="filter-input-element" value="<?= htmlspecialchars($sessionUser['phone']) ?>" required>
+              </div>
+              <div class="filter-ctrl">
+                <label>Inquiry Message *</label>
+                <textarea id="inquiryMessageField" class="filter-input-element" rows="4" placeholder="Ask questions about society regulations or deeds..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-brand btn-block">
+                <i data-lucide="send"></i> Dispatch Message
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 6: DEDICATED GUEST PROFILE & ACCOUNT VAULT (#view-profile)
+       ======================================================================== -->
+  <main class="view-pane" id="view-profile">
+    <div class="container" style="max-width: 980px;">
+      
+      <div class="breadcrumbs-strip">
+        <a onclick="routeTo('catalog')"><i data-lucide="arrow-left" style="width:14px; vertical-align:middle;"></i> Return to Residences</a>
+        <span>/</span>
+        <span>Resident & Guest Profile</span>
+      </div>
+
+      <!-- Profile Header Identity Card -->
+      <div class="profile-hero-card">
+        <div class="profile-avatar-large">
+          <?php if ($sessionUser['is_logged_in']): ?>
+            <?= strtoupper(substr($sessionUser['full_name'], 0, 1)) ?>
+          <?php else: ?>
+            <i data-lucide="user" style="width: 32px;"></i>
+          <?php endif; ?>
+        </div>
+        <div class="profile-title-cluster">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <h1 style="font-size: 22px; font-weight: 800;"><?= htmlspecialchars($sessionUser['full_name']) ?></h1>
+            <span class="kyc-badge-pill"><i data-lucide="shield-check" style="width: 13px;"></i> <?= $sessionUser['is_logged_in'] ? 'Verified Resident Profile' : 'Guest Visitor Session' ?></span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+            <?= htmlspecialchars($sessionUser['email']) ?> <?= !empty($sessionUser['phone']) ? '&bull; ' . htmlspecialchars($sessionUser['phone']) : '' ?>
+          </p>
+        </div>
+        <div style="margin-left: auto;">
+          <span class="role-identity-chip">ROLE: <?= htmlspecialchars($sessionUser['role_name']) ?></span>
+        </div>
+      </div>
+
+      <!-- Profile Navigation Sub-Tabs -->
+      <div class="profile-tabs-dock">
+        <button class="profile-subtab-btn active" onclick="switchProfileTab('general')">
+          <i data-lucide="user"></i> Account Details
+        </button>
+        <button class="profile-subtab-btn" onclick="switchProfileTab('activity')">
+          <i data-lucide="history"></i> Ingress & Visits
+        </button>
+        <button class="profile-subtab-btn" onclick="switchProfileTab('security')">
+          <i data-lucide="key-round"></i> Security & Password
+        </button>
+      </div>
+
+      <!-- Tab 1: General Details -->
+      <div class="profile-pane-content active" id="prof-tab-general">
+        <div class="spec-sheet-panel">
+          <h2><i data-lucide="user-pen" style="color:var(--primary-accent);"></i> Personal Identity & KYC</h2>
+          <form onsubmit="handleProfileUpdate(event)">
+            <div class="profile-form-grid">
+              <div class="filter-ctrl">
+                <label>Full Name</label>
+                <input type="text" id="profName" class="input-box" value="<?= htmlspecialchars($sessionUser['full_name']) ?>" required>
+              </div>
+              <div class="filter-ctrl">
+                <label>Registered Email</label>
+                <input type="email" id="profEmail" class="input-box" value="<?= htmlspecialchars($sessionUser['email']) ?>" readonly style="opacity: 0.7; cursor: not-allowed;">
+              </div>
+              <div class="filter-ctrl">
+                <label>Mobile Number (Emergency & Gate SMS)</label>
+                <input type="text" id="profPhone" class="input-box" value="<?= htmlspecialchars($sessionUser['phone']) ?>" placeholder="01XXXXXXXXX">
+              </div>
+              <div class="filter-ctrl">
+                <label>Applicant Occupation / Organization</label>
+                <input type="text" id="profWork" class="input-box" value="Software Architect" placeholder="Your workplace or business">
+              </div>
+            </div>
+            <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-brand">
+                <i data-lucide="save"></i> Save Profile Details
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tab 2: Ingress & Activity -->
+      <div class="profile-pane-content" id="prof-tab-activity">
+        <div class="spec-sheet-panel">
+          <h2><i data-lucide="ticket" style="color:var(--primary-accent);"></i> Viewing Activity & Passes</h2>
+          <div class="key-metrics-grid" style="margin-bottom: 24px;">
+            <div class="metric-data-card">
+              <span class="metric-data-label">Total Visits Booked</span>
+              <span class="metric-data-value" id="profVisitCount">1</span>
+            </div>
+            <div class="metric-data-card">
+              <span class="metric-data-label">Pass Clearance Status</span>
+              <span class="metric-data-value" style="color: var(--emerald);">Active</span>
+            </div>
+            <div class="metric-data-card">
+              <span class="metric-data-label">Preferred Entrance</span>
+              <span class="metric-data-value">Gate Terminal A</span>
+            </div>
+          </div>
+          <div id="profPassesListPlaceholder" style="font-size: 13px; color: var(--text-muted);">
+            Active passes can be inspected and printed anytime from the <strong>Active Clearance Slip</strong> menu.
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Security & Vault -->
+      <div class="profile-pane-content" id="prof-tab-security">
+        <div class="spec-sheet-panel">
+          <h2><i data-lucide="lock" style="color:var(--rose);"></i> Authentication & Sessions</h2>
+          <form onsubmit="handlePasswordChange(event)" style="max-width: 520px;">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="filter-ctrl">
+                <label>Current Password</label>
+                <input type="password" class="input-box" required placeholder="••••••••">
+              </div>
+              <div class="filter-ctrl">
+                <label>New Password (min 8 chars)</label>
+                <input type="password" id="newPassInput" class="input-box" required placeholder="••••••••">
+              </div>
+              <div class="filter-ctrl">
+                <label>Confirm New Password</label>
+                <input type="password" id="confirmPassInput" class="input-box" required placeholder="••••••••">
+              </div>
+              <button type="submit" class="btn btn-dark" style="margin-top: 8px;">
+                <i data-lucide="key"></i> Update Security Credentials
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       MODAL: PHYSICAL VIEWING SCHEDULER
+       ======================================================================== -->
+  <div class="modal-backdrop" id="scheduleModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <strong style="font-size:16px;" id="modalFlatHeading">Schedule Physical Inspection</strong>
+        <button onclick="closeModal()" style="background:none; border:none; cursor:pointer;"><i data-lucide="x"></i></button>
+      </div>
+      <form class="modal-form" onsubmit="handleAppointmentConfirmation(event)">
+        <div class="filter-ctrl">
+          <label>Inspection Date *</label>
+          <input type="date" id="appDate" class="input-box" required>
+        </div>
+        <div class="filter-ctrl">
+          <label>Preferred Time Slot *</label>
+          <select id="appSlot" class="input-box" required>
+            <option value="10:30:00">Morning: 10:30 AM – 11:30 AM</option>
+            <option value="15:00:00">Afternoon: 03:00 PM – 04:00 PM</option>
+            <option value="17:30:00">Evening: 05:30 PM – 06:30 PM</option>
+          </select>
+        </div>
+        <div class="filter-ctrl">
+          <label>Accompanying Visitors Count</label>
+          <input type="number" id="appParty" class="input-box" value="2" min="1" max="4" required>
+        </div>
+        <div style="background:var(--bg-surface-alt); padding:12px; border-radius:var(--radius-xs); font-size:12px; color:var(--text-muted);">
+          <i data-lucide="shield-check" style="width:14px; vertical-align:middle;"></i>
+          Confirming will issue your single-use 6-digit Gate OTP on the dedicated pass page.
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-brand">Confirm Appointment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Bubble -->
+  <div class="toast-pill" id="appToast">
+    <i data-lucide="check-circle" style="color:var(--emerald);"></i>
+    <span id="toastMessage">Done</span>
+  </div>
+
+  <!-- ========================================================================
+       UNIFIED CLIENT-SIDE CONTROLLER
+       ======================================================================== -->
+  <script>
+    // 1. Theme Engine
+    function applyTheme(theme) {
+      const icon = document.getElementById('themeIcon');
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.body.setAttribute('data-theme', 'dark');
+        localStorage.setItem('greenview_theme', 'dark');
+        if (icon) icon.setAttribute('data-lucide', 'sun');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.body.removeAttribute('data-theme');
+        localStorage.setItem('greenview_theme', 'light');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function toggleThemeMode() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.getAttribute('data-theme') === 'dark';
+      applyTheme(isDark ? 'light' : 'dark');
+    }
+
+    const savedTheme = localStorage.getItem('greenview_theme') || 'light';
+    applyTheme(savedTheme);
+
+    // 2. Profile Dropdown Toggler
+    function toggleProfileDropdown() {
+      const menu = document.getElementById('profileFlyoutMenu');
+      if (menu) menu.classList.toggle('active');
+    }
+
+    function closeProfileDropdown() {
+      const menu = document.getElementById('profileFlyoutMenu');
+      if (menu) menu.classList.remove('active');
+    }
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+      const dropdownArea = document.getElementById('profileDropdownArea');
+      if (dropdownArea && !dropdownArea.contains(e.target)) {
+        closeProfileDropdown();
+      }
+    });
+
+    // 3. Global State Variables
+    let activeSelectedFlat = null;
+    let currentGeneratedPass = null;
+
+    // 4. Single Page Application (SPA) Router
+    window.routeTo = function(viewKey) {
+      document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-link').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.mobile-dock-btn').forEach(btn => btn.classList.remove('active'));
+
+      if (viewKey === 'catalog') {
+        document.getElementById('view-catalog').classList.add('active');
+        document.getElementById('tabNavCatalog')?.classList.add('active');
+        document.getElementById('mDockCatalog')?.classList.add('active');
+      } else if (viewKey === 'rent-details') {
+        document.getElementById('view-rent-details').classList.add('active');
+      } else if (viewKey === 'buy-details') {
+        document.getElementById('view-buy-details').classList.add('active');
+      } else if (viewKey === 'appointment-pass') {
+        document.getElementById('view-appointment-pass').classList.add('active');
+        document.getElementById('tabNavPasses')?.classList.add('active');
+      } else if (viewKey === 'amenities') {
+        document.getElementById('view-amenities').classList.add('active');
+        document.getElementById('tabNavAmenities')?.classList.add('active');
+        document.getElementById('mDockAmenities')?.classList.add('active');
+      } else if (viewKey === 'office') {
+        document.getElementById('view-office').classList.add('active');
+        document.getElementById('tabNavOffice')?.classList.add('active');
+        document.getElementById('mDockOffice')?.classList.add('active');
+      } else if (viewKey === 'profile') {
+        document.getElementById('view-profile').classList.add('active');
+        document.getElementById('mDockProfile')?.classList.add('active');
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.lucide) lucide.createIcons();
+    };
+
+    // 5. Live Flat Catalog Fetch from MySQL API
+    async function fetchLiveFlats() {
+      const query = document.getElementById('srchQuery')?.value || '';
+      const mode = document.getElementById('srchMode')?.value || 'ALL';
+      const block = document.getElementById('srchBlock')?.value || 'ALL';
+      const budget = document.getElementById('srchBudget')?.value || 'ALL';
+
+      const params = new URLSearchParams({
+        search: query,
+        mode: mode,
+        block: block,
+        budget: budget === 'ALL' ? 0 : budget
+      });
+
+      try {
+        const res = await fetch(`get_flats.php?${params.toString()}`);
+        const data = await res.json();
+        if (data.success) {
+          renderCatalog(data.data);
+        }
+      } catch (err) {
+        console.error("Failed to load flats from database:", err);
+      }
+    }
+
+    function renderCatalog(flats) {
+      const deck = document.getElementById('catalogFlatsDeck');
+      const countLabel = document.getElementById('telemetryFlatsCount');
+      if (countLabel) countLabel.textContent = flats.length;
+
+      if (!deck) return;
+
+      if (flats.length === 0) {
+        deck.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);">No units match your search criteria.</div>`;
+        return;
+      }
+
+      deck.innerHTML = flats.map(f => {
+        const isRent = f.listing_type === 'RENT';
+        const priceNum = parseFloat(f.base_price);
+        const priceLabel = isRent 
+          ? `৳ ${priceNum.toLocaleString()} <span>/ mo</span>` 
+          : `৳ ${(priceNum / 10000000).toFixed(2)} Crore`;
+
+        return `
+          <div class="flat-inventory-card">
+            <div class="flat-card-viewport">
+              <img src="${f.photo}" class="flat-card-photo" alt="${f.flat_number}">
+              <span class="floating-type-badge ${f.listing_type.toLowerCase()}">For ${f.listing_type}</span>
+            </div>
+            <div class="flat-card-content">
+              <div class="flat-card-heading">${f.flat_number}</div>
+              <div class="flat-card-address">
+                <i data-lucide="map-pin" style="width:13px;"></i> ${f.building_block} &bull; Greenview Heights
+              </div>
+              
+              <div class="flat-attributes-matrix">
+                <div class="matrix-item"><i data-lucide="maximize" style="width:14px;"></i> ${f.square_feet} sqft</div>
+                <div class="matrix-item"><i data-lucide="car" style="width:14px;"></i> RFID Bay</div>
+                <div class="matrix-item"><i data-lucide="shield-check" style="width:14px;"></i> Guarded</div>
+              </div>
+
+              <div class="financial-primary-sum">${priceLabel}</div>
+
+              <div style="margin-top:auto;">
+                ${isRent ? `
+                  <button class="btn btn-brand btn-block" onclick="openDedicatedRentPage(${f.flat_id})">
+                    View Rent Specifications <i data-lucide="arrow-right" style="width:14px;"></i>
+                  </button>
+                ` : `
+                  <button class="btn btn-emerald btn-block" onclick="openDedicatedBuyPage(${f.flat_id})">
+                    View Acquisition Deed <i data-lucide="arrow-right" style="width:14px;"></i>
+                  </button>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // 6. Dedicated Details Page Fetch
+    async function openDedicatedRentPage(flatId) {
+      try {
+        const res = await fetch(`get_flat_details.php?flat_id=${flatId}`);
+        const data = await res.json();
+        if (data.success) {
+          const flat = data.flat;
+          activeSelectedFlat = flat;
+
+          document.getElementById('rentBreadcrumbUnit').textContent = flat.unit;
+          document.getElementById('rentDetailSqft').textContent = `${flat.sqft} sqft`;
+          document.getElementById('rentDetailBase').textContent = `৳ ${flat.base_price.toLocaleString()}`;
+          document.getElementById('rentDetailService').textContent = `৳ ${flat.service_charge.toLocaleString()}`;
+          document.getElementById('rentDetailUtility').textContent = `৳ ${flat.utility_estimate.toLocaleString()}`;
+          document.getElementById('rentDetailDeposit').textContent = `৳ ${flat.deposit.toLocaleString()}`;
+          document.getElementById('rentDetailTotal').textContent = `৳ ${flat.total_initial.toLocaleString()}`;
+          document.getElementById('rentSidebarPrice').innerHTML = `৳ ${flat.base_price.toLocaleString()} <span>/ mo</span>`;
+          document.getElementById('rentSidebarServiceCaption').textContent = `+ ৳ ${flat.service_charge.toLocaleString()} monthly society maintenance`;
+
+          routeTo('rent-details');
+        }
+      } catch (err) {
+        console.error("Failed to load details:", err);
+      }
+    }
+
+    async function openDedicatedBuyPage(flatId) {
+      try {
+        const res = await fetch(`get_flat_details.php?flat_id=${flatId}`);
+        const data = await res.json();
+        if (data.success) {
+          const flat = data.flat;
+          activeSelectedFlat = flat;
+
+          document.getElementById('buyBreadcrumbUnit').textContent = flat.unit;
+          document.getElementById('buyDetailSqft').textContent = `${flat.sqft} sqft`;
+          document.getElementById('buyDetailPrice').textContent = `৳ ${flat.base_price.toLocaleString()}`;
+          document.getElementById('buyDetailDownpayment').textContent = `৳ ${flat.downpayment.toLocaleString()}`;
+          document.getElementById('buySidebarPrice').textContent = `৳ ${(flat.base_price / 10000000).toFixed(2)} Cr`;
+
+          routeTo('buy-details');
+        }
+      } catch (err) {
+        console.error("Failed to load details:", err);
+      }
+    }
+
+    // 7. Appointment Modal & Gate Slip API Call
+    window.openViewingModal = function() {
+      if (!activeSelectedFlat) return;
+      document.getElementById('modalFlatHeading').textContent = `Viewing Appointment: ${activeSelectedFlat.unit}`;
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      document.getElementById('appDate').value = tomorrow.toISOString().split('T')[0];
+
+      document.getElementById('scheduleModal').classList.add('active');
+    };
+
+    window.closeModal = function() {
+      document.getElementById('scheduleModal').classList.remove('active');
+    };
+
+    async function handleAppointmentConfirmation(e) {
+      e.preventDefault();
+      if (!activeSelectedFlat) return;
+
+      const formData = new FormData();
+      formData.append('flat_id', activeSelectedFlat.id);
+      formData.append('visit_date', document.getElementById('appDate').value);
+      formData.append('slot_time', document.getElementById('appSlot').value);
+      formData.append('party_size', document.getElementById('appParty').value);
+
+      try {
+        const res = await fetch('book_viewing.php', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          const pass = result.pass;
+          currentGeneratedPass = pass;
+
+          document.getElementById('passOtpDigit').textContent = pass.gate_otp;
+          document.getElementById('passUnitTarget').textContent = pass.unit;
+          document.getElementById('passScheduleWindow').textContent = pass.schedule;
+          document.getElementById('passPartyAllowance').textContent = `${pass.party_size} Persons Maximum`;
+          document.getElementById('passOwnerContact').textContent = pass.owner_contact;
+
+          const slipNav = document.getElementById('tabNavPasses');
+          if (slipNav) slipNav.style.display = 'inline-flex';
+
+          closeModal();
+          triggerToast("Appointment verified! Clearance Slip issued.");
+          routeTo('appointment-pass');
+        } else {
+          triggerToast(result.message || "Failed to book appointment.");
+        }
+      } catch (err) {
+        console.error("Booking error:", err);
+      }
+    }
+
+    window.openActivePassView = function() {
+      if (currentGeneratedPass) {
+        routeTo('appointment-pass');
+      } else {
+        triggerToast("Please book an appointment first to view clearance slip.");
+      }
+    };
+
+    // 8. Profile Subtabs Controller
+    window.switchProfileTab = function(subTabKey) {
+      document.querySelectorAll('.profile-subtab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.profile-pane-content').forEach(pane => pane.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      const targetPane = document.getElementById(`prof-tab-${subTabKey}`);
+      if (targetPane) targetPane.classList.add('active');
+      if (window.lucide) lucide.createIcons();
+    };
+
+    async function handleProfileUpdate(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append('action', 'profile');
+      formData.append('full_name', document.getElementById('profName').value);
+      formData.append('phone_number', document.getElementById('profPhone').value);
+
+      try {
+        const res = await fetch('update_profile.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        triggerToast(data.message);
+      } catch(err) {
+        triggerToast("Profile update failed.");
+      }
+    }
+
+    async function handlePasswordChange(e) {
+      e.preventDefault();
+      const nPass = document.getElementById('newPassInput').value;
+      const cPass = document.getElementById('confirmPassInput').value;
+      if (nPass !== cPass) {
+        triggerToast("Error: Passwords do not match.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('action', 'password');
+      formData.append('new_password', nPass);
+
+      try {
+        const res = await fetch('update_profile.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        triggerToast(data.message);
+        e.target.reset();
+      } catch(err) {
+        triggerToast("Password update failed.");
+      }
+    }
+
+    async function handleInquirySubmit(e) {
+      e.preventDefault();
+      const msg = document.getElementById('inquiryMessageField').value;
+      const formData = new FormData();
+      formData.append('message', msg);
+      formData.append('flat_id', activeSelectedFlat ? activeSelectedFlat.id : 1);
+
+      try {
+        const res = await fetch('submit_inquiry.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        triggerToast(data.message);
+        e.target.reset();
+      } catch(err) {
+        triggerToast("Inquiry dispatch failed.");
+      }
+    }
+
+    function triggerToast(msg) {
+      const toast = document.getElementById('appToast');
+      const text = document.getElementById('toastMessage');
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), 3500);
+    }
+
+    // 9. Single Unified Bootstrapper Event
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) lucide.createIcons();
+      fetchLiveFlats();
+
+      ['srchQuery', 'srchMode', 'srchBlock', 'srchBudget'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', fetchLiveFlats);
+      });
+
+      const resetBtn = document.getElementById('srchResetBtn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          document.getElementById('srchQuery').value = '';
+          document.getElementById('srchMode').value = 'ALL';
+          document.getElementById('srchBlock').value = 'ALL';
+          document.getElementById('srchBudget').value = 'ALL';
+          fetchLiveFlats();
+        });
+      }
+    });
+  </script>
+</body>
+</html>
