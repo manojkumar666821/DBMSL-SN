@@ -1,0 +1,2538 @@
+<?php
+// ============================================================================
+// ARCHITECTURE: Enterprise Flat Owner Property Governance Portal (Single-File)
+// FILE: owner/owner_dashboard.php (or index.php)
+// REFACTORED: Society Circulars & Official Notice Alerts + Rent & Handover Hub
+// ============================================================================
+session_start();
+date_default_timezone_set('Asia/Dhaka');
+
+$isLoggedIn = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+
+$fullName = $isLoggedIn ? ($_SESSION['full_name'] ?? 'Zubaer Hossain, FCA') : 'Zubaer Hossain, FCA';
+$nameParts = preg_split('/\s+/', trim($fullName));
+$avatarInitials = count($nameParts) > 1 
+    ? strtoupper(substr($nameParts[0], 0, 1) . substr(end($nameParts), 0, 1))
+    : strtoupper(substr($fullName, 0, 2));
+
+$sessionUser = [
+    'is_logged_in' => $isLoggedIn,
+    'user_id'      => $isLoggedIn ? (int)$_SESSION['user_id'] : 2,
+    'first_name'   => $nameParts[0] ?? 'Zubaer',
+    'last_name'    => end($nameParts) ?? 'Hossain',
+    'full_name'    => $fullName,
+    'initials'     => !empty($avatarInitials) ? $avatarInitials : 'ZH',
+    'email'        => $isLoggedIn ? ($_SESSION['email'] ?? 'owner.zubaer@greenview.internal') : 'owner.zubaer@greenview.internal',
+    'phone'        => $isLoggedIn ? ($_SESSION['phone_number'] ?? '+880 1711-223344') : '+880 1711-223344',
+    'dob'          => '1985-11-20',
+    'role_id'      => 3,
+    'role_name'    => 'FLAT_OWNER'
+];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Greenview Heights — Flat Owner Command & Asset Governance</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-canvas: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-alt: #f1f5f9;
+      --bg-glass: rgba(255, 255, 255, 0.94);
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      --text-main: #090d16;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+
+      --primary-accent: #2563eb;
+      --primary-accent-hover: #1d4ed8;
+      --primary-accent-soft: #eff6ff;
+
+      --emerald: #10b981;
+      --emerald-hover: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #f59e0b;
+      --amber-soft: #fffbeb;
+      --rose: #ef4444;
+      --rose-soft: #fef2f2;
+      --indigo: #6366f1;
+
+      --radius-xs: 8px;
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 20px 35px -8px rgba(15, 23, 42, 0.12);
+
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090d16 !important;
+      --bg-surface: #111827 !important;
+      --bg-surface-alt: #1a2234 !important;
+      --bg-glass: rgba(17, 24, 39, 0.94) !important;
+      --border-subtle: #1f2937 !important;
+      --border-strong: #374151 !important;
+
+      --text-main: #f8fafc !important;
+      --text-secondary: #cbd5e1 !important;
+      --text-muted: #94a3b8 !important;
+
+      --primary-accent: #3b82f6 !important;
+      --primary-accent-hover: #60a5fa !important;
+      --primary-accent-soft: rgba(59, 130, 246, 0.15) !important;
+      --emerald-soft: rgba(16, 185, 129, 0.15) !important;
+      --amber-soft: rgba(245, 158, 11, 0.15) !important;
+      --rose-soft: rgba(239, 68, 68, 0.15) !important;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    * { scrollbar-width: none !important; }
+    *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+
+    .container {
+      max-width: 1340px;
+      margin: 0 auto;
+      padding: 0 clamp(16px, 3vw, 28px);
+      width: 100%;
+    }
+
+    /* TOP APPLICATION NAVIGATION */
+    .app-nav {
+      position: sticky;
+      top: 0;
+      z-index: 500;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-container {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .brand-symbol {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+
+    .nav-tabs-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+      background: var(--bg-surface-alt);
+      padding: 4px 6px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-subtle);
+      overflow-x: auto;
+      max-width: 100%;
+      flex-shrink: 1;
+    }
+
+    .nav-tab-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 15px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .nav-tab-link:hover { color: var(--text-main); }
+    .nav-tab-link.active {
+      background: var(--bg-surface);
+      color: var(--primary-accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-actions-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    /* NOTIFICATION FLYOUT */
+    .notif-bell-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition);
+    }
+    .notif-dot {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 8px;
+      height: 8px;
+      background: var(--rose);
+      border-radius: var(--radius-full);
+      border: 1.5px solid var(--bg-surface);
+    }
+
+    .notif-flyout-card {
+      position: absolute;
+      top: calc(100% + 14px);
+      right: 50px;
+      width: 320px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 600;
+    }
+    .notif-flyout-card.active { display: flex; animation: flyoutFade 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .notif-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .notif-item.rent { background: var(--emerald-soft); border-left: 3px solid var(--emerald); }
+    .notif-item.notice { background: var(--primary-accent-soft); border-left: 3px solid var(--primary-accent); }
+    .notif-item.viewing { background: var(--amber-soft); border-left: 3px solid var(--amber); }
+
+    .theme-trigger-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .profile-circle-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+      color: #ffffff !important;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border: 2px solid rgba(255, 255, 255, 0.8) !important;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      user-select: none;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .profile-circle-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 3px var(--primary-accent-soft);
+    }
+
+    /* VIEW PANES */
+    .view-pane {
+      display: none;
+      padding: 32px 0 80px;
+      animation: fadeInView 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .view-pane.active { display: block; }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes flyoutFade {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* HERO */
+    .hero-view {
+      padding: 44px 0 28px;
+      background: radial-gradient(circle at 10% 20%, var(--primary-accent-soft) 0%, transparent 40%);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 32px;
+    }
+
+    .hero-split {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      background: var(--primary-accent-soft);
+      color: var(--primary-accent);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      border: 1px solid rgba(37, 99, 235, 0.2);
+    }
+
+    .hero-headline {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.18;
+      margin-bottom: 14px;
+    }
+    .hero-headline span { color: var(--primary-accent); }
+
+    .hero-telemetry-cluster {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+      max-width: 440px;
+    }
+
+    .telemetry-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .telemetry-val {
+      font-size: 20px;
+      font-weight: 800;
+      display: block;
+      color: var(--text-main);
+    }
+
+    .telemetry-lbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .hero-poster-frame {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .hero-poster-img {
+      width: 100%;
+      height: 320px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .poster-caption-glass {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .spec-sheet-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: clamp(18px, 3vw, 32px);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 28px;
+    }
+
+    .panel-header-cluster {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    /* RESPONSIVE TABLE TO CARD SYSTEM */
+    .table-responsive-box {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .standard-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+
+    .standard-table th {
+      background: var(--bg-surface-alt);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+
+    .standard-table td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+    .standard-table tr:last-child td { border-bottom: none; }
+
+    @media (max-width: 768px) {
+      .table-responsive-box {
+        border: none;
+        overflow-x: visible;
+      }
+      .standard-table {
+        min-width: 100% !important;
+      }
+      .standard-table thead {
+        display: none;
+      }
+      .standard-table, 
+      .standard-table tbody, 
+      .standard-table tr, 
+      .standard-table td {
+        display: block;
+        width: 100%;
+      }
+      .standard-table tr {
+        background: var(--bg-surface);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        margin-bottom: 14px;
+        padding: 12px 16px;
+        box-shadow: var(--shadow-sm);
+      }
+      .standard-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--border-subtle);
+        text-align: right;
+        font-size: 13px;
+      }
+      .standard-table td:last-child {
+        border-bottom: none;
+        padding-top: 12px;
+        justify-content: flex-end;
+      }
+      .standard-table td::before {
+        content: attr(data-label);
+        font-weight: 800;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        text-align: left;
+        margin-right: 12px;
+      }
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .badge-pill.active, .badge-pill.verified, .badge-pill.paid, .badge-pill.confirmed { background: var(--emerald-soft); color: var(--emerald); }
+    .badge-pill.pending, .badge-pill.listed { background: var(--amber-soft); color: var(--amber); }
+    .badge-pill.unpaid, .badge-pill.declined { background: var(--rose-soft); color: var(--rose); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-xs);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .btn-brand { background: var(--primary-accent); color: #fff; }
+    .btn-brand:hover { background: var(--primary-accent-hover); }
+    .btn-emerald { background: var(--emerald); color: #fff; }
+    .btn-emerald:hover { background: var(--emerald-hover); }
+    .btn-outline { background: transparent; border-color: var(--border-subtle); color: var(--text-main); }
+    .btn-outline:hover { background: var(--bg-surface-alt); }
+    .btn-outline-emerald { background: transparent; border-color: var(--emerald); color: var(--emerald); }
+    .btn-outline-emerald:hover { background: var(--emerald-soft); }
+    .btn-danger { background: var(--rose); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .filter-ctrl { display: flex; flex-direction: column; gap: 6px; }
+    .filter-ctrl label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569; letter-spacing: 0.03em; }
+    [data-theme="dark"] .filter-ctrl label { color: #94a3b8; }
+
+    .input-box {
+      background: #f1f5f9;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 13.5px;
+      color: #090d16;
+      outline: none;
+      width: 100%;
+      transition: var(--transition);
+    }
+    .input-box:focus {
+      border-color: var(--primary-accent) !important;
+      background: #ffffff !important;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+    [data-theme="dark"] .input-box {
+      background: #1a2234;
+      border-color: #374151;
+      color: #f8fafc;
+    }
+
+    /* SUB TABS & SWITCHERS */
+    .amenity-subtabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid var(--border-subtle);
+      padding-bottom: 12px;
+      overflow-x: auto;
+    }
+    .amenity-subtab-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: var(--radius-xs);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .amenity-subtab-btn:hover { color: var(--text-main); background: var(--bg-surface-alt); }
+    .amenity-subtab-btn.active {
+      background: var(--primary-accent-soft);
+      color: var(--primary-accent);
+      border-color: rgba(37, 99, 235, 0.3);
+    }
+
+    .amenity-subpanel { display: none; }
+    .amenity-subpanel.active { display: block; animation: fadeInView 0.2s ease; }
+
+    /* PROFILE WORKSPACE */
+    .profile-card-canvas {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: clamp(20px, 4vw, 40px);
+      box-shadow: var(--shadow-sm);
+    }
+    .profile-grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.60);
+      backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .modal-backdrop.active { display: flex !important; }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+      overflow: hidden;
+      animation: popInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popInModal {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header-pic2 {
+      padding: 22px 24px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header-pic2 h3 {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-full);
+      transition: var(--transition);
+    }
+    .modal-close-btn:hover { background: var(--bg-surface-alt); color: var(--text-main); }
+
+    .modal-body-pic2 {
+      padding: 10px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-actions-pic2 {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .btn-pic2-cancel {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      color: #334155;
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-pic2-cancel:hover { background: #f8fafc; }
+    [data-theme="dark"] .btn-pic2-cancel {
+      background: #1e293b;
+      border-color: #334155;
+      color: #cbd5e1;
+    }
+
+    .btn-pic2-submit {
+      background: #1d64ec;
+      border: 1px solid #1d64ec;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(29, 100, 236, 0.28);
+      transition: var(--transition);
+    }
+    .btn-pic2-submit:hover { background: #1754c8; }
+
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-lg);
+      z-index: 2000;
+    }
+    .toast-pill.active { display: flex; }
+
+    /* CLEAN 4-ITEM MOBILE BOTTOM DOCK */
+    .mobile-bottom-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 400;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px;
+    }
+
+    .mobile-dock-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+      padding: 6px 0;
+    }
+    .mobile-dock-btn.active { color: var(--primary-accent); }
+
+    .app-footer {
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      padding: 50px 0 24px;
+      margin-top: auto;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr 1.1fr;
+      gap: 40px;
+      margin-bottom: 30px;
+    }
+
+    @media (max-width: 992px) {
+      .hero-split { grid-template-columns: 1fr; }
+      .nav-tabs-group { display: none; }
+      .mobile-bottom-bar { display: flex; }
+      body { padding-bottom: 70px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+    }
+    @media (max-width: 640px) {
+      .hero-headline { font-size: 26px; }
+      .nav-container { height: 68px; }
+      .profile-grid-two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP NAVIGATION -->
+  <header class="app-nav">
+    <div class="container nav-container">
+      
+      <div class="brand-cluster" onclick="routeTo('home')">
+        <div class="brand-symbol">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <div>
+          <span class="brand-title">Greenview Heights</span>
+          <div style="font-size: 10.5px; font-weight: 800; color: var(--primary-accent); text-transform: uppercase;">Flat Owner Portal</div>
+        </div>
+      </div>
+
+      <!-- Center Navigation Tabs -->
+      <ul class="nav-tabs-group">
+        <li>
+          <button class="nav-tab-link active" id="tabNavHome" onclick="routeTo('home')">
+            <i data-lucide="home" style="width: 15px;"></i> Overview
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavPortfolio" onclick="routeTo('portfolio')">
+            <i data-lucide="layers" style="width: 15px;"></i> My Units
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavViewing" onclick="routeTo('viewing')">
+            <i data-lucide="calendar-check-2" style="width: 15px;"></i> Viewing Desk
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavDues" onclick="routeTo('dues')">
+            <i data-lucide="receipt" style="width: 15px;"></i> Society & My Dues
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavAmenities" onclick="routeTo('amenities')">
+            <i data-lucide="sparkles" style="width: 15px;"></i> Amenities
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavComplaints" onclick="routeTo('complaints')">
+            <i data-lucide="wrench" style="width: 15px;"></i> Complaints
+            <span style="position: absolute; top: 4px; right: 6px; width: 7px; height: 7px; background: var(--rose); border-radius: var(--radius-full);"></span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- Right Controls: Notification Bell + Theme + Dedicated Profile Circle -->
+      <div class="nav-actions-cluster">
+        
+        <!-- NAVBAR NOTIFICATION BELL WITH ALERTS (NOTICES, RENT, INQUIRIES) -->
+        <button class="notif-bell-btn" id="notifBellBtn" title="Society Notices & Rent Alerts" onclick="toggleNotificationDropdown()">
+          <i data-lucide="bell" style="width: 18px;"></i>
+          <span class="notif-dot" id="notifBadgeDot"></span>
+        </button>
+
+        <!-- NOTIFICATION FLYOUT -->
+        <div class="notif-flyout-card" id="notifFlyout">
+          <div style="font-weight: 800; font-size: 13.5px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Notifications & Notices</span>
+            <span style="font-size:10.5px; color:var(--primary-accent); font-weight:700;">3 New</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+            <!-- 1. Society General Notice -->
+            <div class="notif-item notice">
+              <strong style="color: var(--primary-accent); display:flex; align-items:center; gap:5px;">
+                <i data-lucide="megaphone" style="width:13px;"></i> Official Society Notice
+              </strong>
+              <div>Annual General Meeting (AGM 2026) scheduled for next Sunday at Majestic Banquet Hall.</div>
+              <span style="font-size: 10px; color: var(--text-muted);">Today &bull; 02:00 PM</span>
+            </div>
+
+            <!-- 2. Rent Payment Received -->
+            <div class="notif-item rent">
+              <strong style="color: var(--emerald); display:flex; align-items:center; gap:5px;">
+                <i data-lucide="check-circle" style="width:13px;"></i> Rent Payment Received!
+              </strong>
+              <div>Dr. Ariful Islam credited ৳ 45,000 for Unit B-204 (bKash TrxID: TRX-99882211A).</div>
+              <span style="font-size: 10px; color: var(--text-muted);">Today &bull; 10:14 AM</span>
+            </div>
+
+            <!-- 3. Viewing Desk Inquiry -->
+            <div class="notif-item viewing">
+              <strong style="color: var(--amber); display:flex; align-items:center; gap:5px;">
+                <i data-lucide="key" style="width:13px;"></i> Gate Pass Synced
+              </strong>
+              <div>S. M. Mahfuzul Alam verified Gate OTP 731-904 for Unit B-302 physical inspection.</div>
+              <span style="font-size: 10px; color: var(--text-muted);">Today &bull; 09:14 AM</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="theme-trigger-btn" id="themeBtn" title="Toggle Display Theme" onclick="toggleThemeMode()">
+          <i data-lucide="moon" id="themeIcon"></i>
+        </button>
+
+        <!-- DEDICATED PROFILE CIRCLE BUTTON WITH VISIBLE INITIALS -->
+        <button class="profile-circle-btn" id="profileCircleBtn" title="Go to My Profile Workspace" onclick="routeTo('profile')">
+          <?= htmlspecialchars($sessionUser['initials'], ENT_QUOTES, 'UTF-8') ?>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- CLEAN 4-ITEM MOBILE DOCK (EXACT MATCH: HOME, UNITS, VIEWING, COMPLAINTS) -->
+  <nav class="mobile-bottom-bar">
+    <button class="mobile-dock-btn active" id="mDockHome" onclick="routeTo('home')">
+      <i data-lucide="home" style="width: 18px;"></i>
+      <span>Home</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockPortfolio" onclick="routeTo('portfolio')">
+      <i data-lucide="layers" style="width: 18px;"></i>
+      <span>Units</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockViewing" onclick="routeTo('viewing')">
+      <i data-lucide="calendar-check-2" style="width: 18px;"></i>
+      <span>Viewing</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockComplaints" onclick="routeTo('complaints')">
+      <i data-lucide="wrench" style="width: 18px;"></i>
+      <span>Complaints</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================
+       VIEW 0: FULL LANDING OVERVIEW (#view-home)
+       ======================================================================== -->
+  <main class="view-pane active" id="view-home">
+    <section class="hero-view">
+      <div class="container hero-split">
+        <div>
+          <div class="hero-tag">
+            <i data-lucide="shield-check" style="width: 14px;"></i> Verified Property Owner &bull; <?= htmlspecialchars($sessionUser['full_name'], ENT_QUOTES, 'UTF-8') ?>
+          </div>
+          <h1 class="hero-headline">
+            Asset Governance & Unit Management for <span>Greenview</span>.
+          </h1>
+          <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 24px; max-width: 560px;">
+            Oversee verified title deeds, list vacant apartments for rent or sale, evaluate applicant viewing queues with auto-synced 6-digit gate OTPs, manage unified dues, and review circular notices.
+          </p>
+
+          <div class="hero-telemetry-cluster">
+            <div class="telemetry-card">
+              <span class="telemetry-val">2 Units</span>
+              <span class="telemetry-lbl">Allocated Property</span>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-val" style="color: var(--emerald);">VERIFIED</span>
+              <span class="telemetry-lbl">Deed Registry State</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-poster-frame">
+          <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80" class="hero-poster-img" alt="Greenview Towers">
+          <div class="poster-caption-glass">
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">Unit A-401 & Unit B-302</div>
+              <div style="font-size: 12px; opacity: 0.8;">Sub-Registry & Mutation Verified with Society</div>
+            </div>
+            <span style="font-size: 11px; background: rgba(37,99,235,0.3); color:#3b82f6; padding: 4px 10px; border-radius: var(--radius-full); font-weight:800;">OWNER VERIFIED</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOCIETY OFFICIAL NOTICES DESK (NEW INTEGRATION) -->
+    <div class="container" style="margin-bottom: 32px;">
+      <div class="spec-sheet-panel" style="padding: 24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 style="font-size: 17px; font-weight:800; display:flex; align-items:center; gap:8px;">
+              <i data-lucide="megaphone" style="color:var(--primary-accent); width:18px;"></i> Society Circulars & Official Notices
+            </h3>
+            <p style="font-size:12.5px; color:var(--text-muted);">Recent announcements, AGM meetings, and development advisories from executive committee.</p>
+          </div>
+          <span class="badge-pill active">LIVE NOTICE BOARD</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:12px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge-pill active" style="font-size:10px;">AGM NOTICE</span>
+              <span style="font-size:11px; color:var(--text-muted);">2026-09-24</span>
+            </div>
+            <h4 style="font-size:14.5px; font-weight:800; margin-bottom:4px;">Annual General Meeting (AGM 2026)</h4>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Scheduled for coming Sunday at 07:00 PM at Majestic Banquet Hall. Audit report will be presented.</p>
+            <button class="btn btn-outline btn-sm" onclick="triggerToast('Downloading AGM_Notice_2026.pdf...')">
+              <i data-lucide="download" style="width:12px;"></i> Download PDF
+            </button>
+          </div>
+
+          <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:12px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span class="badge-pill pending" style="font-size:10px;">MAINTENANCE</span>
+              <span style="font-size:11px; color:var(--text-muted);">2026-09-22</span>
+            </div>
+            <h4 style="font-size:14.5px; font-weight:800; margin-bottom:4px;">Main Elevator Servicing Window</h4>
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Block A & B passenger lifts will undergo technical overhaul from 11:00 AM to 02:00 PM this Saturday.</p>
+            <button class="btn btn-outline btn-sm" onclick="triggerToast('Circular viewed.')">
+              <i data-lucide="eye" style="width:12px;"></i> View Advisory
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Operations Grid -->
+    <div class="container">
+      <div style="margin-bottom: 28px;">
+        <h2 style="font-size: 24px; font-weight: 800;">Property Governance Modules</h2>
+        <p style="color: var(--text-muted); font-size: 13.5px;">Click any dedicated module below to manage your assets.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px;">
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('portfolio')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--primary-accent-soft); color: var(--primary-accent); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="layers"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">My Property Units</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Overview owned flats with real-time status: Living, Rented, or Sold.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('viewing')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--emerald-soft); color: var(--emerald); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="calendar-check-2"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Visiting Queue & Handover</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Applicant viewing schedule with gate OTP sync and direct lease/sale handover execution.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('dues')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="receipt"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Society & My Dues</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Pay unified charges with item omit toggles, automatic invoice generation, and clearance NOCs.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('complaints')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.15); color: var(--rose); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="bell"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">2-Way Complaints Hub</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Lodge formal statements to the committee or review incoming tenant concerns.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 1: MY PROPERTY UNITS (#view-portfolio)
+       ======================================================================== -->
+  <main class="view-pane" id="view-portfolio">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="layers" style="color:var(--primary-accent);"></i> My Property Units</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Deed-verified property portfolio. Status reflects whether the unit is occupied by owner, leased to tenant, or transferred.</p>
+          </div>
+          <button class="btn btn-brand" onclick="openModal('modalPublishListing')">
+            <i data-lucide="tag"></i> List Vacant Flat (Rent/Sale)
+          </button>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Unit Ref</th>
+                <th>Floor & Area</th>
+                <th>Deed Clearance</th>
+                <th>Occupancy / Resident Details</th>
+                <th>Property State</th>
+                <th>Registry Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyPortfolio">
+              <tr id="unitRowA401">
+                <td data-label="Unit Ref"><strong>Unit A-401 (Block A)</strong></td>
+                <td data-label="Floor & Area">4th Floor &bull; 1,850 SqFt</td>
+                <td data-label="Deed Clearance"><span class="badge-pill verified"><i data-lucide="check-circle" style="width:12px;"></i> VERIFIED</span></td>
+                <td data-label="Occupancy">Owner Primary Residence (Self Occupied)</td>
+                <td data-label="Property State"><span class="badge-pill active">OWNER LIVING</span></td>
+                <td data-label="Action">
+                  <button class="btn btn-outline btn-sm" onclick="triggerToast('Opening sub-registry deed_unit_a401.pdf...')">
+                    <i data-lucide="file-text" style="width:12px;"></i> View Title Deed
+                  </button>
+                </td>
+              </tr>
+              <tr id="unitRowB302">
+                <td data-label="Unit Ref"><strong>Unit B-302 (Block B)</strong></td>
+                <td data-label="Floor & Area">3rd Floor &bull; 1,600 SqFt</td>
+                <td data-label="Deed Clearance"><span class="badge-pill verified"><i data-lucide="check-circle" style="width:12px;"></i> VERIFIED</span></td>
+                <td data-label="Occupancy" id="allocDetailsB302">Vacant (Listed for Rent at ৳ 38,000/mo)</td>
+                <td data-label="Property State"><span class="badge-pill listed" id="stateBadgeB302">LISTED FOR RENT</span></td>
+                <td data-label="Action">
+                  <div style="display:flex; gap:8px;">
+                    <button class="btn btn-outline btn-sm" onclick="routeTo('viewing')">
+                      <i data-lucide="users" style="width:12px;"></i> Queue
+                    </button>
+                    <button class="btn btn-outline btn-sm" onclick="triggerToast('Opening deed_unit_b302.pdf...')">
+                      <i data-lucide="file-text" style="width:12px;"></i> Deed
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 2: VIEWING DESK & HANDOVER TRANSFER (#view-viewing)
+       ======================================================================== -->
+  <main class="view-pane" id="view-viewing">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="calendar-check-2" style="color:var(--emerald);"></i> Visiting Queue & Handover Desk</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Manage viewing inquiries with auto-synced 6-digit gate OTPs. Execute digital handover to tenant or buyer, and revoke allocation when needed.</p>
+          </div>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Queue Priority</th>
+                <th>Target Unit</th>
+                <th>Applicant Name</th>
+                <th>Contact Phone</th>
+                <th>Inquiry Type</th>
+                <th>Request Timestamp</th>
+                <th>6-Digit Gate OTP</th>
+                <th>Current Status</th>
+                <th>Handover Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyFcfs">
+              <tr id="fcfsRow1">
+                <td data-label="Queue Priority"><strong style="color:var(--emerald); font-family:var(--font-mono);">#01 (Priority)</strong></td>
+                <td data-label="Target Unit">Unit B-302</td>
+                <td data-label="Applicant Name"><strong>S. M. Mahfuzul Alam</strong></td>
+                <td data-label="Contact Phone"><code>01719876543</code></td>
+                <td data-label="Inquiry Type"><span class="badge-pill active">RENT APPLICANT</span></td>
+                <td data-label="Timestamp">2026-09-24 09:14:22</td>
+                <td data-label="Gate OTP"><strong style="font-family:var(--font-mono); color:var(--primary-accent); letter-spacing:1px;">731-904</strong></td>
+                <td data-label="Current Status"><span class="badge-pill active" id="statusBadgeRow1">VISITED GATE</span></td>
+                <td data-label="Handover Action" id="actionCellRow1">
+                  <button class="btn btn-emerald btn-sm" onclick="openHandoverModal('S. M. Mahfuzul Alam', 'Unit B-302', 'TENANT', 'fcfsRow1')">
+                    <i data-lucide="key" style="width:12px;"></i> Handover Tenant
+                  </button>
+                </td>
+              </tr>
+              <tr id="fcfsRow2">
+                <td data-label="Queue Priority"><strong style="color:var(--text-muted); font-family:var(--font-mono);">#02</strong></td>
+                <td data-label="Target Unit">Unit B-302</td>
+                <td data-label="Applicant Name"><strong>Engr. Tariqul Islam</strong></td>
+                <td data-label="Contact Phone"><code>01815544332</code></td>
+                <td data-label="Inquiry Type"><span class="badge-pill active">BUYER APPLICANT</span></td>
+                <td data-label="Timestamp">2026-09-24 10:45:10</td>
+                <td data-label="Gate OTP"><strong style="font-family:var(--font-mono); color:var(--primary-accent); letter-spacing:1px;">512-880</strong></td>
+                <td data-label="Current Status"><span class="badge-pill pending" id="statusBadgeRow2">PENDING VISIT</span></td>
+                <td data-label="Handover Action" id="actionCellRow2">
+                  <button class="btn btn-brand btn-sm" onclick="openHandoverModal('Engr. Tariqul Islam', 'Unit B-302', 'BUYER', 'fcfsRow2')">
+                    <i data-lucide="award" style="width:12px;"></i> Handover Buyer
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 3: MERGED DUES (SOCIETY + MY DUES) (#view-dues)
+       ======================================================================== -->
+  <main class="view-pane" id="view-dues">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2><i data-lucide="receipt" style="color:var(--primary-accent);"></i> Society & My Property Dues Ledger</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Unified assessment of common maintenance and unit utilities. Omit any line item before checkout; Clearance NOC generates automatically upon full clearance.</p>
+          </div>
+          <button class="btn btn-outline" id="btnDownloadNoc" onclick="downloadClearanceNocAction()" disabled title="Pay statement below to unlock certificate">
+            <i data-lucide="file-check"></i> Download Clearance NOC
+          </button>
+        </div>
+
+        <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:clamp(16px, 2.5vw, 26px); margin-bottom:30px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+            <div>
+              <span class="badge-pill unpaid" id="badgeInvoiceStatus">UNPAID &bull; SEPTEMBER 2026</span>
+              <h3 style="font-size:20px; font-weight:800; margin-top:8px;">September Unified Assessment Statement</h3>
+              <div style="font-size:12px; color:var(--text-muted);">Invoice Ref: <code>#UNIFIED-2026-09</code> &bull; Due: 2026-09-30</div>
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Selected Total Payable</span>
+              <div style="font-size:28px; font-weight:800; font-family:var(--font-mono); color:var(--primary-accent);" id="totalDuesAmountDisplay">৳ 12,000</div>
+            </div>
+          </div>
+
+          <div class="table-responsive-box" style="margin-bottom:20px;">
+            <table class="standard-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align:center;">Include</th>
+                  <th>Assessment Description</th>
+                  <th>Classification</th>
+                  <th>Covered Unit</th>
+                  <th>Charge Amount</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyMergedDues">
+                <tr id="dueRow1">
+                  <td data-label="Include" style="text-align:center;">
+                    <input type="checkbox" class="due-checkbox" checked data-amount="5500" onchange="recalculateMergedDues()">
+                  </td>
+                  <td data-label="Description"><strong>Central Elevator, Security & Generator Maintenance</strong></td>
+                  <td data-label="Classification">Society Dues</td>
+                  <td data-label="Unit">Unit A-401 (Primary)</td>
+                  <td data-label="Amount">৳ 5,500</td>
+                  <td data-label="Action"><button class="btn btn-outline btn-sm" onclick="omitDueRow('dueRow1', 5500)">Omit Item</button></td>
+                </tr>
+                <tr id="dueRow2">
+                  <td data-label="Include" style="text-align:center;">
+                    <input type="checkbox" class="due-checkbox" checked data-amount="4000" onchange="recalculateMergedDues()">
+                  </td>
+                  <td data-label="Description"><strong>Vacant Unit Caretaking & Surcharge Fee</strong></td>
+                  <td data-label="Classification">Society Dues</td>
+                  <td data-label="Unit">Unit B-302 (Secondary)</td>
+                  <td data-label="Amount">৳ 4,000</td>
+                  <td data-label="Action"><button class="btn btn-outline btn-sm" onclick="omitDueRow('dueRow2', 4000)">Omit Item</button></td>
+                </tr>
+                <tr id="dueRow3">
+                  <td data-label="Include" style="text-align:center;">
+                    <input type="checkbox" class="due-checkbox" checked data-amount="2500" onchange="recalculateMergedDues()">
+                  </td>
+                  <td data-label="Description"><strong>Quarterly Water Booster Pump & Sewerage Assessment</strong></td>
+                  <td data-label="Classification">My Dues (Unit Utilities)</td>
+                  <td data-label="Unit">All Owned Units</td>
+                  <td data-label="Amount">৳ 2,500</td>
+                  <td data-label="Action"><button class="btn btn-outline btn-sm" onclick="omitDueRow('dueRow3', 2500)">Omit Item</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <span style="font-size:12px; color:var(--text-muted);">Omitted items will be excluded from the instant bill and deferred to next cycle.</span>
+            <button class="btn btn-emerald" id="btnPayOnlineTrigger" onclick="openModal('modalPayOnline')">
+              <i data-lucide="credit-card"></i> Pay Online
+            </button>
+          </div>
+        </div>
+
+        <!-- PAYMENT HISTORY & DOWNLOAD TABLE -->
+        <h3 style="font-size:16px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+          <i data-lucide="history" style="width:17px; color:var(--emerald);"></i> Payment History, Invoices & Clearance NOCs
+        </h3>
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Receipt / Invoice Ref</th>
+                <th>Billing Assessment</th>
+                <th>Amount Cleared</th>
+                <th>Payment Mode</th>
+                <th>Transaction TrxID</th>
+                <th>Status</th>
+                <th>Downloads</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyPaymentHistory">
+              <tr>
+                <td data-label="Receipt Ref"><strong>#REC-2026-08-OWN</strong></td>
+                <td data-label="Assessment">August Unified Dues</td>
+                <td data-label="Amount"><strong>৳ 12,000</strong></td>
+                <td data-label="Mode">bKash Corporate Gateway</td>
+                <td data-label="TrxID"><code>TRX-OWN88192A</code></td>
+                <td data-label="Status"><span class="badge-pill paid">SETTLED</span></td>
+                <td data-label="Downloads">
+                  <div style="display:flex; gap:6px; justify-content: flex-end;">
+                    <button class="btn btn-outline btn-sm" onclick="triggerToast('Downloading Invoice #REC-2026-08.pdf...')">
+                      <i data-lucide="file-text" style="width:12px;"></i> Invoice
+                    </button>
+                    <button class="btn btn-outline-emerald btn-sm" onclick="triggerToast('Downloading Clearance NOC_August_2026.pdf...')">
+                      <i data-lucide="file-check-2" style="width:12px;"></i> NOC
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 4: AMENITIES HUB (#view-amenities)
+       ======================================================================== -->
+  <main class="view-pane" id="view-amenities">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div style="margin-bottom:20px;">
+          <h2><i data-lucide="sparkles" style="color:var(--emerald);"></i> Society Amenities & Fitness Center</h2>
+          <p style="font-size:13px; color:var(--text-muted);">Enroll membership tiers, book dedicated slots, and complete payment checkout.</p>
+        </div>
+
+        <div class="amenity-subtabs">
+          <button class="amenity-subtab-btn active" id="btnSubGym" onclick="switchAmenitySubTab('gym')">
+            <i data-lucide="dumbbell" style="width:16px;"></i> Apex Gym Membership
+          </button>
+          <button class="amenity-subtab-btn" id="btnSubTurf" onclick="switchAmenitySubTab('turf')">
+            <i data-lucide="activity" style="width:16px;"></i> Skyview Futsal Turf
+          </button>
+          <button class="amenity-subtab-btn" id="btnSubHall" onclick="switchAmenitySubTab('hall')">
+            <i data-lucide="landmark" style="width:16px;"></i> Majestic Banquet Hall
+          </button>
+        </div>
+
+        <!-- SUB-PAGE 1: APEX GYM (STEP 1: ENROLLMENT OVERVIEW) -->
+        <div class="amenity-subpanel active" id="subpanel-gym">
+          <div id="gymStep1Enrollment">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 26px;">
+              <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px;">
+                <span class="badge-pill active" style="margin-bottom:12px;">FITNESS & WELLNESS</span>
+                <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Apex Fitness Center</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+                  Cardio suite, Olympic free weights, yoga zone, certified personal trainers, steam room, and lockers.
+                </p>
+                <ul style="list-style:none; display:flex; flex-direction:column; gap:8px; font-size:13px; color:var(--text-main);">
+                  <li><i data-lucide="check" style="width:14px; color:var(--emerald); vertical-align:middle;"></i> Location: 3rd Floor Club Floor</li>
+                  <li><i data-lucide="check" style="width:14px; color:var(--emerald); vertical-align:middle;"></i> Operating Hours: 06:00 AM – 11:00 PM</li>
+                  <li><i data-lucide="check" style="width:14px; color:var(--emerald); vertical-align:middle;"></i> Complimentary Locker for Owners</li>
+                </ul>
+              </div>
+
+              <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <span class="badge-pill verified" style="margin-bottom:12px;">STEP 1: ENROLLMENT INFO</span>
+                  <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Choose Membership Plan</h3>
+                  <div class="filter-ctrl" style="margin-bottom:12px;">
+                    <label>SELECT TIER</label>
+                    <select id="gymEnrollPlanSelect" class="input-box">
+                      <option value="1500">Monthly Pass — ৳ 1,500 / month</option>
+                      <option value="4000">Quarterly Pass — ৳ 4,000 (3 Months)</option>
+                      <option value="14000">Annual Pass — ৳ 14,000 (Full Year)</option>
+                    </select>
+                  </div>
+                  <div class="filter-ctrl">
+                    <label>PREFERRED ACCESS SHIFT</label>
+                    <select id="gymEnrollShiftSelect" class="input-box">
+                      <option value="Morning (06:00 AM – 11:00 AM)">Morning (06:00 AM – 11:00 AM)</option>
+                      <option value="Evening (04:00 PM – 10:00 PM)">Evening (04:00 PM – 10:00 PM)</option>
+                      <option value="All Day Access">All Day Unrestricted Access</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="btn btn-emerald" style="margin-top:16px;" onclick="goToGymPaymentStep2()">
+                  Proceed to Payment Checkout &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: DEDICATED GYM PAYMENT PANE -->
+          <div id="gymStep2Payment" style="display:none; background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:26px; margin-bottom:26px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:1px solid var(--border-subtle); padding-bottom:12px;">
+              <div>
+                <span class="badge-pill active">STEP 2: PAYMENT CHECKOUT</span>
+                <h3 style="font-size:18px; font-weight:800; margin-top:4px;">Pay Gym Membership Fees</h3>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="returnToGymStep1()">&larr; Change Plan</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:18px;">
+              <div>
+                <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:800;">Selected Plan</div>
+                <div style="font-size:16px; font-weight:800;" id="gymDisplaySelectedPlan">Monthly Pass</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:800;">Amount Due</div>
+                <div style="font-size:24px; font-weight:800; color:var(--emerald); font-family:var(--font-mono);" id="gymDisplayAmount">৳ 1,500</div>
+              </div>
+            </div>
+
+            <div class="filter-ctrl" style="margin-bottom:14px;">
+              <label>PAYMENT CHANNEL *</label>
+              <select id="gymCheckoutGateway" class="input-box">
+                <option value="bKash Merchant">bKash Online Merchant</option>
+                <option value="Nagad Express">Nagad Express</option>
+                <option value="City Bank Direct Wire">City Bank Direct Transfer</option>
+              </select>
+            </div>
+
+            <div class="filter-ctrl" style="margin-bottom:18px;">
+              <label>TRANSACTION REFERENCE (TRXID) *</label>
+              <input type="text" id="gymCheckoutTrxId" class="input-box" placeholder="e.g. TRX-GYM991823">
+            </div>
+
+            <button class="btn btn-emerald" onclick="submitGymMembershipPayment()">Confirm & Pay Gym Fees</button>
+          </div>
+
+          <h3 style="font-size:15px; font-weight:800; margin-bottom:12px;">My Gym Subscriptions</h3>
+          <div class="table-responsive-box">
+            <table class="standard-table">
+              <thead>
+                <tr>
+                  <th>Subscription Ref</th>
+                  <th>Plan Tier</th>
+                  <th>Member Name</th>
+                  <th>Validity Period</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyGym">
+                <tr>
+                  <td data-label="Ref"><strong>#GYM-OWN-101</strong></td>
+                  <td data-label="Plan">Owner Family Pass</td>
+                  <td data-label="Member">Zubaer Hossain, FCA</td>
+                  <td data-label="Validity">2026-09-01 to 2026-12-31</td>
+                  <td data-label="Status"><span class="badge-pill active">ACTIVE</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-PAGE 2: TURF -->
+        <div class="amenity-subpanel" id="subpanel-turf">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:24px; margin-bottom:26px;">
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px;">
+              <span class="badge-pill active" style="margin-bottom:12px;">OUTDOOR SPORTS</span>
+              <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Skyview Futsal & Turf</h3>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+                Rooftop artificial turf for 7-a-side futsal and box cricket tournaments.
+              </p>
+              <div style="font-size:13px; color:var(--text-muted);">
+                Rate: <strong>৳ 1,200 / hour</strong> &bull; Concurrency lock protects your slot while booking.
+              </div>
+            </div>
+
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Reserve Skyview Turf Slot</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Select slot time and confirm online checkout.</p>
+              </div>
+              <button class="btn btn-emerald" onclick="openModal('modalBookTurf')">
+                <i data-lucide="calendar-plus"></i> Fill Info & Pay for Turf Slot
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-PAGE 3: BANQUET HALL -->
+        <div class="amenity-subpanel" id="subpanel-hall">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:24px; margin-bottom:26px;">
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px;">
+              <span class="badge-pill pending" style="margin-bottom:12px;">COMMUNITY VENUE</span>
+              <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Majestic Banquet Hall</h3>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+                Central AC hall for 200 guests with stage, sound system, and catering kitchen.
+              </p>
+              <div style="font-size:13px; color:var(--text-muted);">
+                Shift Fee: <strong>৳ 12,000 / shift</strong> &bull; Refundable security deposit: ৳ 5,000.
+              </div>
+            </div>
+
+            <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:24px; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <h3 style="font-size:18px; font-weight:800; margin-bottom:8px;">Book Hall Venue</h3>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Select event shift, guest count, and pay booking advance.</p>
+              </div>
+              <button class="btn btn-emerald" onclick="openModal('modalBookHall')">
+                <i data-lucide="landmark"></i> Fill Info & Pay for Banquet Hall
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 5: 2-WAY COMPLAINTS DESK (#view-complaints)
+       ======================================================================== -->
+  <main class="view-pane" id="view-complaints">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="wrench" style="color:var(--amber);"></i> 2-Way Maintenance & Complaints Center</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Submit complaints to the society managing committee or inspect complaints lodged against your units.</p>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-outline-emerald" onclick="openModal('modalSubmitWrittenComplaint')">
+              <i data-lucide="file-edit"></i> Submit Written Complaint
+            </button>
+            <button class="btn btn-emerald" onclick="openModal('modalLogRepairTicket')">
+              <i data-lucide="plus-circle"></i> Log Repair Ticket
+            </button>
+          </div>
+        </div>
+
+        <div class="amenity-subtabs" style="margin-bottom:20px;">
+          <button class="amenity-subtab-btn active" id="btnCmpMine" onclick="switchComplaintSubTab('mine')">
+            <i data-lucide="send" style="width:15px;"></i> Lodged by Me (To Committee)
+          </button>
+          <button class="amenity-subtab-btn" id="btnCmpReceived" onclick="switchComplaintSubTab('received')">
+            <i data-lucide="inbox" style="width:15px;"></i> Received Against My Units (From Tenants/Neighbors)
+            <span class="badge-pill unpaid" style="padding:2px 7px; font-size:10px; margin-left:6px;">1 Action Required</span>
+          </button>
+        </div>
+
+        <!-- TABLE A: LODGED BY ME -->
+        <div class="table-responsive-box" id="cmpPanelMine">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Classification</th>
+                <th>Target Scope</th>
+                <th>Statement Summary</th>
+                <th>Filed Date</th>
+                <th>Committee Status</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyComplaintsMine">
+              <tr>
+                <td data-label="Ticket ID"><strong>#OWN-TKT-201</strong></td>
+                <td data-label="Class">STRUCTURAL</td>
+                <td data-label="Target">Unit B-302 (Balcony)</td>
+                <td data-label="Statement">Exterior wall rainwater dampness and hairline plaster fissures.</td>
+                <td data-label="Date">2026-09-21</td>
+                <td data-label="Status"><span class="badge-pill pending">UNDER REVIEW</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABLE B: RECEIVED FROM TENANTS/NEIGHBORS -->
+        <div class="table-responsive-box" id="cmpPanelReceived" style="display:none;">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Notice ID</th>
+                <th>Originator</th>
+                <th>Target Unit</th>
+                <th>Complaint Description</th>
+                <th>Date Received</th>
+                <th>Resolution Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyComplaintsReceived">
+              <tr>
+                <td data-label="Notice ID"><strong>#NOTIF-891</strong></td>
+                <td data-label="Originator">Dr. Ariful Islam (Tenant)</td>
+                <td data-label="Target Unit">Unit B-204 (Floor below B-302)</td>
+                <td data-label="Description">Bathroom ceiling water seepage observed from upper unit drainage trap.</td>
+                <td data-label="Date">2026-09-23</td>
+                <td data-label="Status"><span class="badge-pill unpaid">ACTION REQUIRED</span></td>
+                <td data-label="Action">
+                  <button class="btn btn-emerald btn-sm" onclick="triggerToast('Maintenance repair team scheduled for Unit B-302.')">
+                    Schedule Fix
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VIEW 6: FIGMA-GRADE PROFILE WORKSPACE (#view-profile)
+       ======================================================================== -->
+  <main class="view-pane" id="view-profile">
+    <div class="container" style="max-width: 820px;">
+      <div class="profile-card-canvas">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:18px; margin-bottom:24px;">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <div style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: #ffffff; font-size: 18px; font-weight: 800; display:flex; align-items:center; justify-content:center; box-shadow: var(--shadow-sm);">
+              <?= htmlspecialchars($sessionUser['initials'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+            <div>
+              <h2 style="font-size:22px; font-weight:800; line-height:1.2;">Welcome, <?= htmlspecialchars($sessionUser['first_name'], ENT_QUOTES, 'UTF-8') ?></h2>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Verified Property Owner &bull; <?php echo date('D, d F Y'); ?></div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="enableProfileEdit()">
+            <i data-lucide="edit-3" style="width:13px;"></i> Edit Fields
+          </button>
+        </div>
+
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:4px;">Account Information</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:22px;">Update your legal owner account information and personal contact records.</p>
+
+        <div style="font-size:12px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:14px; letter-spacing:0.04em;">Personal Information</div>
+
+        <div class="profile-grid-two" style="margin-bottom:16px;">
+          <div class="filter-ctrl">
+            <label>First Name</label>
+            <input type="text" id="profFirstName" class="input-box" value="<?= htmlspecialchars($sessionUser['first_name'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+          <div class="filter-ctrl">
+            <label>Last Name</label>
+            <input type="text" id="profLastName" class="input-box" value="<?= htmlspecialchars($sessionUser['last_name'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+        </div>
+
+        <div class="profile-grid-two" style="margin-bottom:16px;">
+          <div class="filter-ctrl">
+            <label>Date of Birth</label>
+            <input type="date" id="profDob" class="input-box" value="<?= htmlspecialchars($sessionUser['dob'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+          <div class="filter-ctrl">
+            <label>Mobile Phone</label>
+            <input type="text" id="profPhone" class="input-box" value="<?= htmlspecialchars($sessionUser['phone'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+        </div>
+
+        <div class="filter-ctrl" style="margin-bottom:24px;">
+          <label>Email Address</label>
+          <input type="email" id="profEmail" class="input-box" value="<?= htmlspecialchars($sessionUser['email'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+          <div>
+            <strong style="font-size:14px; display:flex; align-items:center; gap:8px;">
+              <i data-lucide="lock" style="width:16px; color:var(--amber);"></i> Owner Security Credentials
+            </strong>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Password resets require 2-step verification (Current Password + Phone OTP).</p>
+          </div>
+          <button class="btn btn-emerald btn-sm" onclick="openModal('modalPassStep1')">
+            <i data-lucide="key" style="width:13px;"></i> Change Password
+          </button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <button class="btn btn-brand" onclick="saveOwnerProfileFigma()">
+            <i data-lucide="save" style="width:14px;"></i> Update Profile
+          </button>
+
+          <a href="../auth/logout.php" class="btn btn-danger btn-sm" style="display:flex; align-items:center; gap:6px;">
+            <i data-lucide="log-out" style="width:14px;"></i> Terminate Session (Sign Out)
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       MODALS
+       ======================================================================== -->
+
+  <!-- 1. List Apartment for Rent/Sale Modal -->
+  <div class="modal-backdrop" id="modalPublishListing">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>List Verified Apartment for Rent / Sale</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPublishListing')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePublishListing(event)">
+        <div class="filter-ctrl">
+          <label>SELECT OWNED UNIT *</label>
+          <select id="listUnit" class="input-box" required>
+            <option value="Unit B-302" selected>Unit B-302 (Block B &bull; 1,600 SqFt &bull; Vacant)</option>
+            <option value="Unit A-401">Unit A-401 (Block A &bull; 1,850 SqFt &bull; Currently Living)</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>LISTING INTENT *</label>
+          <select id="listType" class="input-box" onchange="toggleListingFields(this.value)">
+            <option value="RENT" selected>List for Rent (Tenancy)</option>
+            <option value="SALE">List for Sale (Permanent Transfer)</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label id="priceLabel">MONTHLY ASKING RENT (BDT) *</label>
+          <input type="number" id="listPrice" class="input-box" required value="38000" placeholder="e.g. 38000">
+        </div>
+
+        <div class="filter-ctrl">
+          <label>SECURITY DEPOSIT / ADVANCE REQUIREMENT *</label>
+          <input type="text" id="listDeposit" class="input-box" required value="৳ 76,000 (2 Months Advance)" placeholder="Terms...">
+        </div>
+
+        <div class="filter-ctrl">
+          <label>EARLIEST HANDOVER DATE *</label>
+          <input type="date" id="listAvailableDate" class="input-box" required>
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPublishListing')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Publish to Marketplace</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Digital Handover & Credential Transfer Modal -->
+  <div class="modal-backdrop" id="modalDigitalHandover">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Digital Handover & Access Transfer</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalDigitalHandover')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handleDigitalHandover(event)">
+        <input type="hidden" id="hoSourceRowId" value="">
+        <div class="filter-ctrl">
+          <label>HANDOVER TARGET UNIT *</label>
+          <select id="hoUnit" class="input-box">
+            <option value="Unit B-302">Unit B-302 (Block B)</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>TRANSFER CLASSIFICATION *</label>
+          <select id="hoType" class="input-box" onchange="updateHandoverNotice(this.value)">
+            <option value="TENANT" selected>Lease Activation & Tenant Credential Dispatch</option>
+            <option value="BUYER">Full Ownership Sale & Digital Deed Relinquishment</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>SELECTED CANDIDATE FULL NAME *</label>
+          <input type="text" id="hoName" class="input-box" required value="S. M. Mahfuzul Alam" placeholder="Full legal name">
+        </div>
+
+        <div class="filter-ctrl">
+          <label>CANDIDATE MOBILE PHONE / PORTAL USER ID *</label>
+          <input type="text" id="hoPhone" class="input-box" required value="01719876543" placeholder="01XXXXXXXXX">
+        </div>
+
+        <div id="handoverNoticeBox" style="background:var(--emerald-soft); padding:12px; border-radius:8px; border:1px solid rgba(16,185,129,0.3); font-size:12px; color:var(--emerald);">
+          <strong>Tenancy Mode:</strong> New tenant portal credentials will be dispatched. You retain structural oversight and rental collection rights.
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalDigitalHandover')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit" id="btnHandoverConfirm">Execute Handover</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Pay Society Assessment Dues Online Modal -->
+  <div class="modal-backdrop" id="modalPayOnline">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Pay Assessment Statement</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPayOnline')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePayDues(event)">
+        <div style="background:var(--bg-surface-alt); padding:14px; border-radius:var(--radius-xs); border:1.5px solid var(--border-subtle);">
+          <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Payable Total (Included Items)</div>
+          <div style="font-size:22px; font-weight:800; color:var(--primary-accent); font-family:var(--font-mono);" id="modalPayableFigure">৳ 12,000</div>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>PAYMENT CHANNEL *</label>
+          <select id="payMethod" class="input-box">
+            <option value="bKash Online Merchant">bKash Online Gateway</option>
+            <option value="Nagad Express">Nagad Express</option>
+            <option value="City Bank Direct Wire">City Bank Corporate Wire</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>TRANSACTION REFERENCE (TRXID) *</label>
+          <input type="text" id="payTrxId" class="input-box" required placeholder="e.g. TRX-OWN9982">
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPayOnline')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Confirm & Pay Online</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Turf Booking Modal -->
+  <div class="modal-backdrop" id="modalBookTurf">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Reserve Turf & Complete Payment</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalBookTurf')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handleBookTurf(event)">
+        <div class="filter-ctrl">
+          <label>PLAY DATE *</label>
+          <input type="date" id="turfDate" class="input-box" required>
+        </div>
+        <div class="filter-ctrl">
+          <label>SHIFT SLOT *</label>
+          <select id="turfTime" class="input-box">
+            <option value="16:00:00 – 17:00:00">16:00:00 – 17:00:00 (৳ 1,200)</option>
+            <option value="17:00:00 – 18:00:00">17:00:00 – 18:00:00 (৳ 1,200)</option>
+            <option value="18:00:00 – 19:00:00">18:00:00 – 19:00:00 (৳ 1,200)</option>
+          </select>
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalBookTurf')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Pay & Confirm Slot</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. Banquet Hall Booking Modal -->
+  <div class="modal-backdrop" id="modalBookHall">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Reserve Banquet Hall & Payment</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalBookHall')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handleBookHall(event)">
+        <div class="filter-ctrl">
+          <label>EVENT DATE *</label>
+          <input type="date" id="hallDate" class="input-box" required>
+        </div>
+        <div class="filter-ctrl">
+          <label>EVENT SHIFT *</label>
+          <select id="hallShift" class="input-box">
+            <option value="Morning Shift (10:00 – 15:00)">Morning Shift (10:00 – 15:00)</option>
+            <option value="Evening Shift (18:00 – 23:00)">Evening Shift (18:00 – 23:00)</option>
+          </select>
+        </div>
+        <div class="filter-ctrl">
+          <label>EXPECTED GUEST COUNT (MAX 200) *</label>
+          <input type="number" id="hallGuests" class="input-box" min="10" max="200" value="120" required>
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalBookHall')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Confirm & Pay Hall Fee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. MODAL A: LOG REPAIR TICKET -->
+  <div class="modal-backdrop" id="modalLogRepairTicket">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Log Repair Ticket</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalLogRepairTicket')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handleLogRepair(event)">
+        <div class="filter-ctrl">
+          <label>REPAIR CATEGORY *</label>
+          <select id="repCategory" class="input-box">
+            <option value="PLUMBING">Plumbing & Water Leakage</option>
+            <option value="ELECTRICAL">Electrical & Circuit Failure</option>
+            <option value="CARPENTRY">Carpentry & Structural Door Fitting</option>
+            <option value="APPLIANCE">Intercom & In-Flat Sockets</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>TARGET PROPERTY UNIT *</label>
+          <select id="repUnit" class="input-box">
+            <option value="Unit A-401">Unit A-401 (Primary Living)</option>
+            <option value="Unit B-302">Unit B-302 (Secondary Vacant)</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>PROBLEM SUMMARY *</label>
+          <textarea id="repSummary" class="input-box" rows="3" required placeholder="e.g. Water mixer pipe leaking, main circuit switch tripping..."></textarea>
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalLogRepairTicket')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Dispatch Repair Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. MODAL B: SUBMIT FORMAL WRITTEN COMPLAINT (IMAGE_669C9B EXACT LAYOUT: PRIORITY REMOVED) -->
+  <div class="modal-backdrop" id="modalSubmitWrittenComplaint">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header-pic2">
+        <h3>Submit Written Complaint</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalSubmitWrittenComplaint')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handleSubmitWrittenComplaint(event)">
+        <div class="filter-ctrl">
+          <label>COMPLAINT TOPIC / SUBJECT *</label>
+          <input type="text" id="wSubject" class="input-box" required placeholder="e.g. Rainwater seepage through exterior expansion joint">
+        </div>
+
+        <div class="filter-ctrl">
+          <label>COMPLAINT CLASSIFICATION *</label>
+          <select id="wCategory" class="input-box">
+            <option value="Structural & Expansion Joint Defect">Structural & Expansion Joint Defect</option>
+            <option value="Society Administration & Security Protocol">Society Administration & Security Protocol</option>
+            <option value="Garbage Disposal & Common Area Sanitation">Garbage Disposal & Common Area Sanitation</option>
+            <option value="Parking Bay Encroachment">Parking Bay Encroachment</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>FORMAL WRITTEN STATEMENT & PARTICULARS *</label>
+          <textarea id="wStatement" class="input-box" rows="4" required placeholder="State full details, duration of occurrence, prior verbal notifications, and required resolution..."></textarea>
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalSubmitWrittenComplaint')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Lodge Formal Complaint</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 8. Step 1 Password Modal -->
+  <div class="modal-backdrop" id="modalPassStep1">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Security Verification</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPassStep1')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePassStep1Next(event)">
+        <div class="filter-ctrl">
+          <label>CURRENT PASSWORD *</label>
+          <input type="password" id="inputCurrentPass" class="input-box" required placeholder="Enter current owner password">
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <a href="javascript:void(0)" onclick="handleForgotPassword()" style="color:var(--emerald); font-size:12px; font-weight:700; text-decoration:none;">Forgot password?</a>
+          <span style="font-size:11px; color:var(--text-muted);">Step 1 of 2</span>
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPassStep1')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Next &bull; Verify OTP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 9. Step 2 Password Modal -->
+  <div class="modal-backdrop" id="modalPassStep2">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Set New Password</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPassStep2')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePassStep2Submit(event)">
+        <div class="filter-ctrl">
+          <label>NEW PASSWORD *</label>
+          <input type="password" id="inputNewPassVal" class="input-box" required placeholder="Min 8 characters">
+        </div>
+        <div class="filter-ctrl">
+          <label>CONFIRM PASSWORD *</label>
+          <input type="password" id="inputConfirmPassVal" class="input-box" required placeholder="Confirm new password">
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPassStep2')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Save Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-pill" id="appToast">
+    <i data-lucide="check-circle" style="color:var(--emerald);"></i>
+    <span id="toastMessage">Done</span>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand-cluster" onclick="routeTo('home')">
+            <div class="brand-symbol">
+              <i data-lucide="shield-check"></i>
+            </div>
+            <span class="brand-title">Greenview Heights</span>
+          </div>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.65; max-width: 360px; margin-top: 14px;">
+            Flat owner property governance system. Title validation, viewing desk, synchronized clearance passes, and digital asset relinquishment.
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main); margin-bottom: 16px;">Quick Portals</h4>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">
+            <li><a onclick="routeTo('home')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Asset Overview</a></li>
+            <li><a onclick="routeTo('portfolio')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">My Property Units</a></li>
+            <li><a onclick="routeTo('viewing')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Viewing Desk</a></li>
+            <li><a onclick="routeTo('dues')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Society & My Dues</a></li>
+            <li><a onclick="routeTo('complaints')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Complaints Desk</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main); margin-bottom: 16px;">Command & Contacts</h4>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <i data-lucide="map-pin" style="width: 15px; vertical-align: middle; color: var(--primary-accent);"></i>
+            <span>Plot 42-45, Greenview Avenue, Nasirabad, Chittagong</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <i data-lucide="phone-call" style="width: 15px; vertical-align: middle; color: var(--primary-accent);"></i>
+            <span>Estate Management: +880 1819-001122</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted);">
+            <i data-lucide="clock" style="width: 15px; vertical-align: middle; color: var(--primary-accent);"></i>
+            <span>Office Hours: 09:00 AM – 06:00 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted);">
+        <div>&copy; <?php echo date('Y'); ?> Greenview Heights Society Management. All Rights Reserved.</div>
+        <div>Owner Governance Portal &bull; Enterprise v3.7</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function applyTheme(theme) {
+      const icon = document.getElementById('themeIcon');
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.body.setAttribute('data-theme', 'dark');
+        localStorage.setItem('greenview_theme', 'dark');
+        if (icon) icon.setAttribute('data-lucide', 'sun');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.body.removeAttribute('data-theme');
+        localStorage.setItem('greenview_theme', 'light');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function toggleThemeMode() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.getAttribute('data-theme') === 'dark';
+      applyTheme(isDark ? 'light' : 'dark');
+    }
+    applyTheme(localStorage.getItem('greenview_theme') || 'light');
+
+    function toggleNotificationDropdown() {
+      const flyout = document.getElementById('notifFlyout');
+      flyout.classList.toggle('active');
+      document.getElementById('notifBadgeDot')?.remove();
+    }
+
+    document.addEventListener('click', (e) => {
+      const flyout = document.getElementById('notifFlyout');
+      const btn = document.getElementById('notifBellBtn');
+      if (flyout && btn && !btn.contains(e.target) && !flyout.contains(e.target)) {
+        flyout.classList.remove('active');
+      }
+    });
+
+    window.routeTo = function(viewKey) {
+      document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-link').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.mobile-dock-btn').forEach(btn => btn.classList.remove('active'));
+
+      const mapNav = {
+        home: ['tabNavHome', 'mDockHome'],
+        portfolio: ['tabNavPortfolio', 'mDockPortfolio'],
+        viewing: ['tabNavViewing', 'mDockViewing'],
+        dues: ['tabNavDues'],
+        amenities: ['tabNavAmenities'],
+        complaints: ['tabNavComplaints', 'mDockComplaints'],
+        profile: ['profileCircleBtn']
+      };
+
+      const targetPane = document.getElementById(`view-${viewKey}`);
+      if (targetPane) targetPane.classList.add('active');
+
+      if (mapNav[viewKey]) {
+        mapNav[viewKey].forEach(id => document.getElementById(id)?.classList.add('active'));
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.lucide) lucide.createIcons();
+    };
+
+    window.openModal = function(id) {
+      document.getElementById(id)?.classList.add('active');
+      if (window.lucide) lucide.createIcons();
+    };
+
+    window.closeModal = function(id) {
+      document.getElementById(id)?.classList.remove('active');
+    };
+
+    function triggerToast(msg) {
+      const toast = document.getElementById('appToast');
+      const text = document.getElementById('toastMessage');
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), 3500);
+    }
+
+    function toggleListingFields(type) {
+      const lbl = document.getElementById('priceLabel');
+      const priceInput = document.getElementById('listPrice');
+      if (type === 'SALE') {
+        lbl.textContent = 'TOTAL ASKING SALE PRICE (BDT) *';
+        priceInput.value = '12000000';
+      } else {
+        lbl.textContent = 'MONTHLY ASKING RENT (BDT) *';
+        priceInput.value = '38000';
+      }
+    }
+
+    function handlePublishListing(e) {
+      e.preventDefault();
+      const unit = document.getElementById('listUnit').value;
+      const type = document.getElementById('listType').value;
+      const price = parseInt(document.getElementById('listPrice').value).toLocaleString();
+
+      if (unit.includes('B-302')) {
+        document.getElementById('stateBadgeB302').textContent = type === 'SALE' ? 'FOR SALE' : 'FOR RENT';
+        document.getElementById('allocDetailsB302').textContent = `Vacant (Marketplace: ${type === 'SALE' ? '৳ ' + price : '৳ ' + price + '/mo'})`;
+      }
+
+      closeModal('modalPublishListing');
+      triggerToast(`${unit} listed on society marketplace (${type === 'SALE' ? 'For Sale' : 'For Rent'})!`);
+    }
+
+    function openHandoverModal(name, unit, classification, sourceRowId) {
+      document.getElementById('hoName').value = name;
+      document.getElementById('hoUnit').value = unit;
+      document.getElementById('hoType').value = classification;
+      document.getElementById('hoSourceRowId').value = sourceRowId;
+      updateHandoverNotice(classification);
+      openModal('modalDigitalHandover');
+    }
+
+    function updateHandoverNotice(type) {
+      const box = document.getElementById('handoverNoticeBox');
+      const btn = document.getElementById('btnHandoverConfirm');
+      if (type === 'BUYER') {
+        box.style.background = 'var(--rose-soft)';
+        box.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        box.style.color = 'var(--rose)';
+        box.innerHTML = '<strong>Warning: Permanent Sale Transfer</strong> Full title deed will be transferred to buyer. Upon execution, your digital control will be relinquished.';
+        btn.textContent = 'Transfer Title & Relinquish';
+        btn.className = 'btn-pic2-submit';
+        btn.style.background = 'var(--rose)';
+      } else {
+        box.style.background = 'var(--emerald-soft)';
+        box.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        box.style.color = 'var(--emerald)';
+        box.innerHTML = '<strong>Tenancy Handover:</strong> Tenant credentials will be dispatched. You retain asset oversight and monthly rent collection.';
+        btn.textContent = 'Execute Handover';
+        btn.className = 'btn-pic2-submit';
+        btn.style.background = '#1d64ec';
+      }
+    }
+
+    function handleDigitalHandover(e) {
+      e.preventDefault();
+      const unit = document.getElementById('hoUnit').value;
+      const name = document.getElementById('hoName').value;
+      const type = document.getElementById('hoType').value;
+      const rowId = document.getElementById('hoSourceRowId').value;
+
+      closeModal('modalDigitalHandover');
+
+      const statusBadge = document.getElementById(`statusBadge${rowId.replace('fcfsRow', 'Row')}`);
+      const actionCell = document.getElementById(`actionCell${rowId.replace('fcfsRow', 'Row')}`);
+
+      if (type === 'TENANT') {
+        if (statusBadge) {
+          statusBadge.className = 'badge-pill active';
+          statusBadge.textContent = 'TENANT ACTIVE';
+        }
+        if (actionCell) {
+          actionCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content: flex-end;">
+              <span style="font-size:12px; font-weight:700; color:var(--emerald);">Leased</span>
+              <button class="btn btn-danger btn-sm" onclick="revokeHandover('${rowId}', '${unit}', 'TENANT')">
+                <i data-lucide="user-x" style="width:12px;"></i> Terminate Lease
+              </button>
+            </div>
+          `;
+        }
+        document.getElementById('stateBadgeB302').className = 'badge-pill active';
+        document.getElementById('stateBadgeB302').textContent = 'RENTED';
+        document.getElementById('allocDetailsB302').textContent = `Rented to ${name} (Agreement Active)`;
+        triggerToast(`Digital handover complete! Credentials dispatched to tenant ${name}.`);
+      } else {
+        if (statusBadge) {
+          statusBadge.className = 'badge-pill unpaid';
+          statusBadge.textContent = 'SOLD & TRANSFERRED';
+        }
+        if (actionCell) {
+          actionCell.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; justify-content: flex-end;">
+              <span style="font-size:12px; font-weight:700; color:var(--rose);">Relinquished</span>
+              <button class="btn btn-outline btn-sm" onclick="revokeHandover('${rowId}', '${unit}', 'BUYER')">
+                Remove Row
+              </button>
+            </div>
+          `;
+        }
+        document.getElementById('stateBadgeB302').className = 'badge-pill unpaid';
+        document.getElementById('stateBadgeB302').textContent = 'SOLD';
+        document.getElementById('allocDetailsB302').textContent = `Sold & Transferred to ${name}`;
+        triggerToast(`Title relinquished! Unit ${unit} transferred to buyer ${name}.`);
+      }
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function revokeHandover(rowId, unit, type) {
+      if (!confirm(`Are you sure you want to cancel allocation/record for ${unit}?`)) return;
+      document.getElementById(rowId)?.remove();
+      if (type === 'TENANT') {
+        document.getElementById('stateBadgeB302').className = 'badge-pill listed';
+        document.getElementById('stateBadgeB302').textContent = 'VACANT';
+        document.getElementById('allocDetailsB302').textContent = 'Vacant Unit (Secondary Asset)';
+        triggerToast(`Tenant lease terminated for ${unit}. Unit is now vacant.`);
+      } else {
+        document.getElementById('unitRowB302')?.remove();
+        triggerToast(`Unit ${unit} archive cleared from your property dashboard.`);
+      }
+    }
+
+    // MERGED DUES & OMISSION
+    function recalculateMergedDues() {
+      let total = 0;
+      document.querySelectorAll('.due-checkbox:checked').forEach(cb => {
+        total += parseInt(cb.getAttribute('data-amount') || '0');
+      });
+      document.getElementById('totalDuesAmountDisplay').textContent = `৳ ${total.toLocaleString()}`;
+      document.getElementById('modalPayableFigure').textContent = `৳ ${total.toLocaleString()}`;
+    }
+
+    function omitDueRow(rowId, amount) {
+      const row = document.getElementById(rowId);
+      if (row) {
+        row.style.opacity = '0.35';
+        const cb = row.querySelector('.due-checkbox');
+        if (cb) cb.checked = false;
+        recalculateMergedDues();
+        triggerToast(`Line item of ৳ ${amount.toLocaleString()} omitted from current checkout statement.`);
+      }
+    }
+
+    function handlePayDues(e) {
+      e.preventDefault();
+      const method = document.getElementById('payMethod').value;
+      const trx = document.getElementById('payTrxId').value;
+      const amountText = document.getElementById('modalPayableFigure').textContent;
+
+      document.getElementById('badgeInvoiceStatus').textContent = 'PAID • SEPTEMBER 2026';
+      document.getElementById('badgeInvoiceStatus').className = 'badge-pill paid';
+      document.getElementById('btnPayOnlineTrigger').disabled = true;
+      document.getElementById('btnPayOnlineTrigger').textContent = 'Statement Settled';
+
+      const nocBtn = document.getElementById('btnDownloadNoc');
+      nocBtn.disabled = false;
+      nocBtn.className = 'btn btn-emerald';
+      nocBtn.title = 'Certificate Unlocked';
+
+      const tbody = document.getElementById('tableBodyPaymentHistory');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Receipt Ref"><strong>#INV-2026-09-OWN</strong></td>
+        <td data-label="Assessment">September Unified Dues</td>
+        <td data-label="Amount"><strong>${amountText}</strong></td>
+        <td data-label="Mode">${method}</td>
+        <td data-label="TrxID"><code>${trx}</code></td>
+        <td data-label="Status"><span class="badge-pill paid">SETTLED</span></td>
+        <td data-label="Downloads">
+          <div style="display:flex; gap:6px; justify-content: flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="triggerToast('Downloading official invoice #INV-2026-09-OWN.pdf...')">
+              <i data-lucide="file-text" style="width:12px;"></i> Invoice
+            </button>
+            <button class="btn btn-outline-emerald btn-sm" onclick="downloadClearanceNocAction()">
+              <i data-lucide="file-check-2" style="width:12px;"></i> NOC
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.prepend(tr);
+
+      closeModal('modalPayOnline');
+      triggerToast(`Payment confirmed via ${method} (TrxID: ${trx})! Invoice & Clearance NOC generated.`);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function downloadClearanceNocAction() {
+      triggerToast('Downloading Society No-Dues Clearance Certificate (NOC-2026-OWN.pdf)...');
+    }
+
+    // 2-PAGE GYM FLOW
+    function goToGymPaymentStep2() {
+      const select = document.getElementById('gymEnrollPlanSelect');
+      const planName = select.options[select.selectedIndex].text.split('—')[0].trim();
+      const amount = parseInt(select.value).toLocaleString();
+
+      document.getElementById('gymDisplaySelectedPlan').textContent = planName;
+      document.getElementById('gymDisplayAmount').textContent = `৳ ${amount}`;
+
+      document.getElementById('gymStep1Enrollment').style.display = 'none';
+      document.getElementById('gymStep2Payment').style.display = 'block';
+    }
+
+    function returnToGymStep1() {
+      document.getElementById('gymStep2Payment').style.display = 'none';
+      document.getElementById('gymStep1Enrollment').style.display = 'block';
+    }
+
+    function submitGymMembershipPayment() {
+      const trx = document.getElementById('gymCheckoutTrxId').value;
+      if (!trx) {
+        triggerToast('Please input payment TrxID.');
+        return;
+      }
+      returnToGymStep1();
+      triggerToast(`Gym membership fees paid! (TrxID: ${trx})`);
+    }
+
+    function switchAmenitySubTab(tabKey) {
+      document.querySelectorAll('.amenity-subpanel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.amenity-subtab-btn').forEach(b => b.classList.remove('active'));
+
+      const targetPanel = document.getElementById(`subpanel-${tabKey}`);
+      if (targetPanel) targetPanel.classList.add('active');
+
+      if (tabKey === 'gym') document.getElementById('btnSubGym')?.classList.add('active');
+      if (tabKey === 'turf') document.getElementById('btnSubTurf')?.classList.add('active');
+      if (tabKey === 'hall') document.getElementById('btnSubHall')?.classList.add('active');
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function handleBookTurf(e) {
+      e.preventDefault();
+      closeModal('modalBookTurf');
+      triggerToast('Turf slot reserved under owner priority quota!');
+    }
+
+    function handleBookHall(e) {
+      e.preventDefault();
+      closeModal('modalBookHall');
+      triggerToast('Banquet Hall reserved! Advance payment recorded.');
+    }
+
+    // 2-WAY COMPLAINTS TAB SWITCHER
+    function switchComplaintSubTab(type) {
+      document.getElementById('btnCmpMine').classList.toggle('active', type === 'mine');
+      document.getElementById('btnCmpReceived').classList.toggle('active', type === 'received');
+      document.getElementById('cmpPanelMine').style.display = type === 'mine' ? 'block' : 'none';
+      document.getElementById('cmpPanelReceived').style.display = type === 'received' ? 'block' : 'none';
+    }
+
+    function handleLogRepair(e) {
+      e.preventDefault();
+      const cat = document.getElementById('repCategory').value;
+      const unit = document.getElementById('repUnit').value;
+      const summary = document.getElementById('repSummary').value;
+
+      const tbody = document.getElementById('tableBodyComplaintsMine');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Ticket ID"><strong>#OWN-TKT-${Math.floor(202 + Math.random() * 500)}</strong></td>
+        <td data-label="Class">${cat}</td>
+        <td data-label="Target">${unit}</td>
+        <td data-label="Statement">${summary}</td>
+        <td data-label="Date"><?php echo date('Y-m-d'); ?></td>
+        <td data-label="Status"><span class="badge-pill pending">DISPATCHED</span></td>
+      `;
+      tbody.prepend(tr);
+      closeModal('modalLogRepairTicket');
+      triggerToast('Repair ticket dispatched to engineering desk!');
+      e.target.reset();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function handleSubmitWrittenComplaint(e) {
+      e.preventDefault();
+      const subject = document.getElementById('wSubject').value;
+      const cat = document.getElementById('wCategory').value;
+      const statement = document.getElementById('wStatement').value;
+
+      const tbody = document.getElementById('tableBodyComplaintsMine');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td data-label="Ticket ID"><strong>#OWN-TKT-${Math.floor(500 + Math.random() * 500)}</strong></td>
+        <td data-label="Class">${cat}</td>
+        <td data-label="Target">Executive Committee</td>
+        <td data-label="Statement"><strong>${subject}:</strong> ${statement}</td>
+        <td data-label="Date"><?php echo date('Y-m-d'); ?></td>
+        <td data-label="Status"><span class="badge-pill pending">LODGED</span></td>
+      `;
+      tbody.prepend(tr);
+      closeModal('modalSubmitWrittenComplaint');
+      triggerToast('Formal written complaint lodged with society committee!');
+      e.target.reset();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Profile & Password Handlers
+    function saveOwnerProfileFigma() {
+      const fName = document.getElementById('profFirstName').value;
+      triggerToast(`Account information successfully updated for ${fName}`);
+    }
+
+    function enableProfileEdit() {
+      document.getElementById('profFirstName').focus();
+      triggerToast('Profile editing enabled.');
+    }
+
+    function handlePassStep1Next(e) {
+      e.preventDefault();
+      const current = document.getElementById('inputCurrentPass').value;
+      if (!current) {
+        triggerToast('Please enter current password.');
+        return;
+      }
+      closeModal('modalPassStep1');
+      triggerToast('Identity verified via OTP verification!');
+      openModal('modalPassStep2');
+    }
+
+    function handleForgotPassword() {
+      triggerToast('Security OTP sent to registered phone.');
+      closeModal('modalPassStep1');
+      openModal('modalPassStep2');
+    }
+
+    function handlePassStep2Submit(e) {
+      e.preventDefault();
+      const p1 = document.getElementById('inputNewPassVal').value;
+      const p2 = document.getElementById('inputConfirmPassVal').value;
+
+      if (!p1 || p1.length < 8) {
+        triggerToast('New password must be at least 8 characters.');
+        return;
+      }
+      if (p1 !== p2) {
+        triggerToast('Passwords do not match.');
+        return;
+      }
+
+      triggerToast('Password updated successfully!');
+      document.getElementById('inputCurrentPass').value = '';
+      document.getElementById('inputNewPassVal').value = '';
+      document.getElementById('inputConfirmPassVal').value = '';
+      closeModal('modalPassStep2');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) lucide.createIcons();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const listDate = document.getElementById('listAvailableDate');
+      if (listDate) listDate.value = tomorrow.toISOString().split('T')[0];
+      const tDate = document.getElementById('turfDate');
+      if (tDate) tDate.value = tomorrow.toISOString().split('T')[0];
+      const hDate = document.getElementById('hallDate');
+      if (hDate) hDate.value = tomorrow.toISOString().split('T')[0];
+      recalculateMergedDues();
+    });
+  </script>
+</body>
+</html>

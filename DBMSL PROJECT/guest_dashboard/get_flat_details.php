@@ -1,58 +1,52 @@
 <?php
-// api/guest/get_flat_details.php
-header('Content-Type: application/json');
+// ============================================================================
+// FILE: guest_dashboard/get_flat_details.php
+// ============================================================================
+header('Content-Type: application/json; charset=utf-8');
+error_reporting(0);
+
 require_once '../config/DBconnect.php';
 
 $flat_id = isset($_GET['flat_id']) ? (int)$_GET['flat_id'] : 0;
 
 if ($flat_id <= 0) {
-    echo json_encode(["success" => false, "message" => "Invalid flat ID."]);
-    exit;
+    echo json_encode(['success' => false, 'message' => 'Invalid Flat ID']);
+    exit();
 }
 
-$sql = "SELECT f.*, u.full_name AS owner_name, u.phone_number AS owner_phone, u.email AS owner_email,
-               ov.status AS deed_status, ov.holding_tax_number
-        FROM flats f
-        JOIN users u ON f.owner_id = u.user_id
-        LEFT JOIN owner_verifications ov ON ov.user_id = u.user_id
-        WHERE f.flat_id = $flat_id LIMIT 1";
+$stmt = $conn->prepare("SELECT * FROM flats WHERE flat_id = ? LIMIT 1");
+$stmt->bind_param("i", $flat_id);
+$stmt->execute();
+$res = $stmt->get_result();
 
-$result = $conn->query($sql);
-
-if ($result && $result->num_rows > 0) {
-    $flat = $result->fetch_assoc();
+if ($flat = $res->fetch_assoc()) {
+    $isRent = (strtoupper($flat['listing_type']) === 'RENT');
+    $basePrice = (float)$flat['base_price'];
+    $serviceCharge = (float)$flat['service_charge'];
     
-    // Calculate ledger splits
-    $basePrice = (float)$flat['rent_amount'];
-    $service   = (float)$flat['service_charge'];
-    $utility   = round($service * 0.75, 2);
-    $deposit   = ($flat['listing_type'] === 'RENT') ? ($basePrice * 2) : 0;
-    $downpayment = ($flat['listing_type'] === 'SALE') ? ($basePrice * 0.10) : 0;
+    // Auto-calculate financial ledger breakdown
+    $deposit = $isRent ? ($basePrice * 2) : 0;
+    $utilityEstimate = $isRent ? 3500.00 : 0;
+    $downpayment = $isRent ? 0 : ($basePrice * 0.10);
+    $cleanBlock = str_ireplace('Block-', '', $flat['building_block']);
 
-    $response = [
-        "success" => true,
-        "flat" => [
-            "id"              => (int)$flat['flat_id'],
-            "unit"            => $flat['flat_number'],
-            "block"           => $flat['building_block'],
-            "type"            => $flat['listing_type'],
-            "sqft"            => (int)$flat['square_feet'],
-            "base_price"      => $basePrice,
-            "service_charge"  => $service,
-            "utility_estimate"=> $utility,
-            "deposit"         => $deposit,
-            "downpayment"     => $downpayment,
-            "total_initial"   => ($flat['listing_type'] === 'RENT') ? ($basePrice + $service + $deposit) : ($basePrice + 200000),
-            "owner_name"      => $flat['owner_name'],
-            "owner_phone"     => $flat['owner_phone'],
-            "deed_verified"   => ($flat['deed_status'] === 'APPROVED'),
-            "holding_tax"     => $flat['holding_tax_number'] ?? 'N/A'
+    echo json_encode([
+        'success' => true,
+        'flat' => [
+            'id'               => (int)$flat['flat_id'],
+            'unit'             => "Unit " . $cleanBlock . "-" . $flat['flat_number'],
+            'block'            => "Block-" . $cleanBlock,
+            'sqft'             => (int)$flat['square_feet'],
+            'listing_type'     => strtoupper($flat['listing_type']),
+            'base_price'       => $basePrice,
+            'service_charge'   => $serviceCharge,
+            'utility_estimate' => $utilityEstimate,
+            'deposit'          => $deposit,
+            'downpayment'      => $downpayment,
+            'total_initial'    => ($basePrice + $serviceCharge + $utilityEstimate + $deposit)
         ]
-    ];
-    echo json_encode($response);
+    ]);
 } else {
-    echo json_encode(["success" => false, "message" => "Flat not found."]);
+    echo json_encode(['success' => false, 'message' => 'Flat record not found']);
 }
-
-$conn->close();
-?>
+exit();

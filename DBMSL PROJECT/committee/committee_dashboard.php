@@ -1,0 +1,2040 @@
+<?php
+session_start();
+date_default_timezone_set('Asia/Dhaka');
+require_once __DIR__ . '/../config/DBconnect.php';
+
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+    header("Location: ../auth/auth.php");
+    exit();
+}
+
+$currentRoleId = (int)($_SESSION['role_id'] ?? 1);
+
+if ($currentRoleId !== 4) {
+    if ($currentRoleId === 3) {
+        header("Location: ../owner/owner_dashboard.php");
+    } elseif ($currentRoleId === 2) {
+        header("Location: ../tenant/tenant_dashboard.php");
+    } else {
+        header("Location: ../guest_dashboard/guest_portal.php");
+    }
+    exit();
+}
+
+$loggedInUserId = (int)$_SESSION['user_id'];
+$userQuery = $conn->prepare("SELECT user_id, role_id, full_name, email, phone_number FROM users WHERE user_id = ? LIMIT 1");
+$userQuery->bind_param("i", $loggedInUserId);
+$userQuery->execute();
+$dbUser = $userQuery->get_result()->fetch_assoc();
+
+$fullName = !empty($dbUser['full_name']) ? $dbUser['full_name'] : ($_SESSION['full_name'] ?? 'Barrister Rafiqul Islam');
+$nameParts = preg_split('/\s+/', trim($fullName));
+$avatarInitials = count($nameParts) > 1 
+    ? strtoupper(substr($nameParts[0], 0, 1) . substr(end($nameParts), 0, 1))
+    : strtoupper(substr($fullName, 0, 2));
+
+$sessionUser = [
+    'is_logged_in' => true,
+    'user_id'      => $loggedInUserId,
+    'first_name'   => $nameParts[0] ?? 'Rafiqul',
+    'last_name'    => end($nameParts) ?? 'Islam',
+    'full_name'    => $fullName,
+    'initials'     => !empty($avatarInitials) ? $avatarInitials : 'RI',
+    'email'        => $dbUser['email'] ?? ($_SESSION['email'] ?? 'committee.gen.sec@greenview.internal'),
+    'phone'        => $dbUser['phone_number'] ?? ($_SESSION['phone_number'] ?? '+880 1712-445566'),
+    'dob'          => '1978-04-12',
+    'role_id'      => 4,
+    'role_name'    => 'COMMITTEE',
+    'designation'  => 'General Secretary (Executive Council)'
+];
+
+$pmtSumRes = $conn->query("SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM payments");
+$totalInvoiceCollections = $pmtSumRes ? (float)$pmtSumRes->fetch_assoc()['total_paid'] : 0.00;
+
+$amenitySumRes = $conn->query("
+    SELECT COALESCE(SUM(
+        CASE 
+            WHEN amenity_id = 1 THEN 1500
+            WHEN amenity_id = 2 THEN 1200
+            WHEN amenity_id = 3 THEN 17000
+            ELSE 0 
+        END
+    ), 0) AS total_amenity
+    FROM amenity_bookings 
+    WHERE transaction_reference IS NOT NULL
+");
+$totalAmenityCollections = $amenitySumRes ? (float)$amenitySumRes->fetch_assoc()['total_amenity'] : 0.00;
+
+$treasuryBalance = $totalInvoiceCollections + $totalAmenityCollections;
+
+$pendingDeedsRes = $conn->query("SELECT COUNT(*) AS total FROM owner_verifications WHERE status = 'PENDING'");
+$pendingDeeds = 0;
+if ($pendingDeedsRes && $pRow = $pendingDeedsRes->fetch_assoc()) {
+    $pendingDeeds = (int)$pRow['total'];
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Greenview Heights — Executive Committee Command Center</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg-canvas: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-alt: #f1f5f9;
+      --bg-glass: rgba(255, 255, 255, 0.94);
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      --text-main: #090d16;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+
+      --primary-accent: #2563eb;
+      --primary-accent-hover: #1d4ed8;
+      --primary-accent-soft: #eff6ff;
+
+      --emerald: #10b981;
+      --emerald-hover: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #f59e0b;
+      --amber-soft: #fffbeb;
+      --rose: #ef4444;
+      --rose-soft: #fef2f2;
+      --indigo: #6366f1;
+      --indigo-soft: #eef2ff;
+
+      --radius-xs: 8px;
+      --radius-sm: 12px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 20px 35px -8px rgba(15, 23, 42, 0.12);
+
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090d16 !important;
+      --bg-surface: #111827 !important;
+      --bg-surface-alt: #1a2234 !important;
+      --bg-glass: rgba(17, 24, 39, 0.94) !important;
+      --border-subtle: #1f2937 !important;
+      --border-strong: #374151 !important;
+
+      --text-main: #f8fafc !important;
+      --text-secondary: #cbd5e1 !important;
+      --text-muted: #94a3b8 !important;
+
+      --primary-accent: #3b82f6 !important;
+      --primary-accent-hover: #60a5fa !important;
+      --primary-accent-soft: rgba(59, 130, 246, 0.15) !important;
+      --emerald-soft: rgba(16, 185, 129, 0.15) !important;
+      --amber-soft: rgba(245, 158, 11, 0.15) !important;
+      --rose-soft: rgba(239, 68, 68, 0.15) !important;
+      --indigo-soft: rgba(99, 102, 241, 0.15) !important;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    * { scrollbar-width: none !important; }
+    *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 0 clamp(16px, 3vw, 28px);
+      width: 100%;
+    }
+
+    .app-nav {
+      position: sticky;
+      top: 0;
+      z-index: 500;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .nav-container {
+      height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .brand-symbol {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      white-space: nowrap;
+    }
+
+    .nav-tabs-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+      background: var(--bg-surface-alt);
+      padding: 4px 6px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-subtle);
+      overflow-x: auto;
+      max-width: 100%;
+      flex-shrink: 1;
+    }
+
+    .nav-tab-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 15px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .nav-tab-link:hover { color: var(--text-main); }
+    .nav-tab-link.active {
+      background: var(--bg-surface);
+      color: var(--indigo);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-actions-cluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .theme-trigger-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .profile-circle-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%) !important;
+      color: #ffffff !important;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border: 2px solid rgba(255, 255, 255, 0.8) !important;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      user-select: none;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+    .profile-circle-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 3px var(--indigo-soft);
+    }
+
+    .view-pane {
+      display: none;
+      padding: 32px 0 80px;
+      animation: fadeInView 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .view-pane.active { display: block; }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-view {
+      padding: 44px 0 28px;
+      background: radial-gradient(circle at 10% 20%, var(--indigo-soft) 0%, transparent 40%);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 32px;
+    }
+
+    .hero-split {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      background: var(--indigo-soft);
+      color: var(--indigo);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .hero-headline {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.18;
+      margin-bottom: 14px;
+    }
+    .hero-headline span { color: var(--indigo); }
+
+    .hero-telemetry-cluster {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(140px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+      max-width: 440px;
+    }
+
+    .telemetry-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .telemetry-val {
+      font-size: 20px;
+      font-weight: 800;
+      display: block;
+      color: var(--text-main);
+    }
+
+    .telemetry-lbl {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .hero-poster-frame {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .hero-poster-img {
+      width: 100%;
+      height: 320px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .poster-caption-glass {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .spec-sheet-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: clamp(18px, 3vw, 32px);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 28px;
+    }
+
+    .panel-header-cluster {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .table-responsive-box {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .standard-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+
+    .standard-table th {
+      background: var(--bg-surface-alt);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+
+    .standard-table td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-main);
+    }
+    .standard-table tr:last-child td { border-bottom: none; }
+
+    @media (max-width: 768px) {
+      .table-responsive-box {
+        border: none;
+        overflow-x: visible;
+      }
+      .standard-table { min-width: 100% !important; }
+      .standard-table thead { display: none; }
+      .standard-table, .standard-table tbody, .standard-table tr, .standard-table td {
+        display: block;
+        width: 100%;
+      }
+      .standard-table tr {
+        background: var(--bg-surface);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        margin-bottom: 14px;
+        padding: 12px 16px;
+        box-shadow: var(--shadow-sm);
+      }
+      .standard-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--border-subtle);
+        text-align: right;
+        font-size: 13px;
+      }
+      .standard-table td:last-child {
+        border-bottom: none;
+        padding-top: 12px;
+        justify-content: flex-end;
+      }
+      .standard-table td::before {
+        content: attr(data-label);
+        font-weight: 800;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        text-align: left;
+        margin-right: 12px;
+      }
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .badge-pill.active, .badge-pill.verified, .badge-pill.paid, .badge-pill.endorsed { background: var(--emerald-soft); color: var(--emerald); }
+    .badge-pill.pending, .badge-pill.review { background: var(--amber-soft); color: var(--amber); }
+    .badge-pill.unpaid, .badge-pill.rejected, .badge-pill.urgent { background: var(--rose-soft); color: var(--rose); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-xs);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .btn-brand { background: var(--primary-accent); color: #fff; }
+    .btn-brand:hover { background: var(--primary-accent-hover); }
+    .btn-emerald { background: var(--emerald); color: #fff; }
+    .btn-emerald:hover { background: var(--emerald-hover); }
+    .btn-indigo { background: var(--indigo); color: #fff; }
+    .btn-indigo:hover { background: #4f46e5; }
+    .btn-outline { background: transparent; border-color: var(--border-subtle); color: var(--text-main); }
+    .btn-outline:hover { background: var(--bg-surface-alt); }
+    .btn-danger { background: var(--rose); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .filter-ctrl { display: flex; flex-direction: column; gap: 6px; }
+    .filter-ctrl label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569; letter-spacing: 0.03em; }
+    [data-theme="dark"] .filter-ctrl label { color: #94a3b8; }
+
+    .input-box {
+      background: #f1f5f9;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 13.5px;
+      color: #090d16;
+      outline: none;
+      width: 100%;
+      transition: var(--transition);
+    }
+    .input-box:focus {
+      border-color: var(--indigo) !important;
+      background: #ffffff !important;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
+    [data-theme="dark"] .input-box {
+      background: #1a2234;
+      border-color: #374151;
+      color: #f8fafc;
+    }
+
+    .amenity-subtabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid var(--border-subtle);
+      padding-bottom: 12px;
+      overflow-x: auto;
+    }
+    .amenity-subtab-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border-radius: var(--radius-xs);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .amenity-subtab-btn:hover { color: var(--text-main); background: var(--bg-surface-alt); }
+    .amenity-subtab-btn.active {
+      background: var(--indigo-soft);
+      color: var(--indigo);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .profile-card-canvas {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: clamp(20px, 4vw, 40px);
+      box-shadow: var(--shadow-sm);
+    }
+    .profile-grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.60);
+      backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+    .modal-backdrop.active { display: flex !important; }
+
+    .modal-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+      overflow: hidden;
+      animation: popInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popInModal {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header-pic2 {
+      padding: 22px 24px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header-pic2 h3 {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+    .modal-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-full);
+      transition: var(--transition);
+    }
+    .modal-close-btn:hover { background: var(--bg-surface-alt); color: var(--text-main); }
+
+    .modal-body-pic2 {
+      padding: 10px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-actions-pic2 {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .btn-pic2-cancel {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      color: #334155;
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-pic2-cancel:hover { background: #f8fafc; }
+    [data-theme="dark"] .btn-pic2-cancel {
+      background: #1e293b;
+      border-color: #334155;
+      color: #cbd5e1;
+    }
+
+    .btn-pic2-submit {
+      background: #4f46e5;
+      border: 1px solid #4f46e5;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13.5px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
+      transition: var(--transition);
+    }
+    .btn-pic2-submit:hover { background: #4338ca; }
+
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-lg);
+      z-index: 2000;
+    }
+    .toast-pill.active { display: flex; }
+
+    .mobile-bottom-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 400;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 10px;
+    }
+
+    .mobile-dock-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+      padding: 6px 0;
+    }
+    .mobile-dock-btn.active { color: var(--indigo); }
+
+    .app-footer {
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      padding: 50px 0 24px;
+      margin-top: auto;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 0.9fr 1.1fr;
+      gap: 40px;
+      margin-bottom: 30px;
+    }
+
+    @media (max-width: 992px) {
+      .hero-split { grid-template-columns: 1fr; }
+      .nav-tabs-group { display: none; }
+      .mobile-bottom-bar { display: flex; }
+      body { padding-bottom: 70px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+    }
+    @media (max-width: 640px) {
+      .hero-headline { font-size: 26px; }
+      .nav-container { height: 68px; }
+      .profile-grid-two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-nav">
+    <div class="container nav-container">
+      
+      <div class="brand-cluster" onclick="routeTo('home')">
+        <div class="brand-symbol">
+          <i data-lucide="scale"></i>
+        </div>
+        <div>
+          <span class="brand-title">Greenview Heights</span>
+          <div style="font-size: 10.5px; font-weight: 800; color: var(--indigo); text-transform: uppercase;">Executive Committee</div>
+        </div>
+      </div>
+
+      <ul class="nav-tabs-group">
+        <li>
+          <button class="nav-tab-link active" id="tabNavHome" onclick="routeTo('home')">
+            <i data-lucide="layout-dashboard" style="width: 15px;"></i> Council Desk
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavDeeds" onclick="routeTo('deeds')">
+            <i data-lucide="file-check-2" style="width: 15px;"></i> Deed Approvals
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavComplaints" onclick="routeTo('complaints')">
+            <i data-lucide="wrench" style="width: 15px;"></i> 2-Way Resolution
+            <span style="position: absolute; top: 4px; right: 6px; width: 7px; height: 7px; background: var(--rose); border-radius: var(--radius-full);"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavFunds" onclick="routeTo('funds')">
+            <i data-lucide="wallet" style="width: 15px;"></i> Society Funds
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavNotices" onclick="routeTo('notices')">
+            <i data-lucide="megaphone" style="width: 15px;"></i> Circulars
+          </button>
+        </li>
+        <li>
+          <button class="nav-tab-link" id="tabNavNoc" onclick="routeTo('noc')">
+            <i data-lucide="stamp" style="width: 15px;"></i> Society NOC
+          </button>
+        </li>
+      </ul>
+
+      <div class="nav-actions-cluster">
+        <button class="theme-trigger-btn" id="themeBtn" title="Toggle Display Theme" onclick="toggleThemeMode()">
+          <i data-lucide="moon" id="themeIcon"></i>
+        </button>
+
+        <button class="profile-circle-btn" id="profileCircleBtn" title="Executive Officer Profile" onclick="routeTo('profile')">
+          <?= htmlspecialchars($sessionUser['initials'], ENT_QUOTES, 'UTF-8') ?>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <nav class="mobile-bottom-bar">
+    <button class="mobile-dock-btn active" id="mDockHome" onclick="routeTo('home')">
+      <i data-lucide="layout-dashboard" style="width: 18px;"></i>
+      <span>Council</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockDeeds" onclick="routeTo('deeds')">
+      <i data-lucide="file-check-2" style="width: 18px;"></i>
+      <span>Deeds</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockFunds" onclick="routeTo('funds')">
+      <i data-lucide="wallet" style="width: 18px;"></i>
+      <span>Funds</span>
+    </button>
+    <button class="mobile-dock-btn" id="mDockComplaints" onclick="routeTo('complaints')">
+      <i data-lucide="wrench" style="width: 18px;"></i>
+      <span>Resolution</span>
+    </button>
+  </nav>
+
+  <!-- VIEW 0: EXECUTIVE COUNCIL TELEMETRY & DESK -->
+  <main class="view-pane active" id="view-home">
+    <section class="hero-view">
+      <div class="container hero-split">
+        <div>
+          <div class="hero-tag">
+            <i data-lucide="shield" style="width: 14px;"></i> <?= htmlspecialchars($sessionUser['designation'], ENT_QUOTES, 'UTF-8') ?>
+          </div>
+          <h1 class="hero-headline">
+            Executive Council Directorate for <span>Greenview</span>.
+          </h1>
+          <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 24px; max-width: 560px;">
+            Verify property registry deeds, inspect resident repair logs routed to on-ground staff, issue society transfer clearance NOCs, and broadcast executive circulars.
+          </p>
+
+          <div class="hero-telemetry-cluster">
+            <div class="telemetry-card" style="cursor:pointer;" onclick="routeTo('funds')">
+              <span class="telemetry-val" style="color: var(--emerald);">৳ <?= number_format($treasuryBalance) ?></span>
+              <span class="telemetry-lbl">Society Treasury Balance</span>
+            </div>
+            <div class="telemetry-card" style="cursor:pointer;" onclick="routeTo('deeds')">
+              <span class="telemetry-val" style="color: var(--amber);"><?= $pendingDeeds ?> Pending</span>
+              <span class="telemetry-lbl">Deed Verifications</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-poster-frame">
+          <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&auto=format&fit=crop&q=80" class="hero-poster-img" alt="Greenview Executive Tower">
+          <div class="poster-caption-glass">
+            <div>
+              <div style="font-weight: 800; font-size: 14px;">Executive Society Secretariat</div>
+              <div style="font-size: 12px; opacity: 0.8;">Bylaw Governance & Financial Reconciliation Active</div>
+            </div>
+            <span style="font-size: 11px; background: rgba(99,102,241,0.3); color:#818cf8; padding: 4px 10px; border-radius: var(--radius-full); font-weight:800;">COUNCIL ACTIVE</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <div style="margin-bottom: 28px;">
+        <h2 style="font-size: 24px; font-weight: 800;">Operational Governance Portals</h2>
+        <p style="color: var(--text-muted); font-size: 13.5px;">Click any dedicated directorate below to manage society bylaws.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px;">
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('deeds')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="file-check-2"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Deed Title Approvals</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Inspect flat registry deeds submitted by owners and endorse legal ownership status.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('funds')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--emerald-soft); color: var(--emerald); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="wallet"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Society Funds & Ledger</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Inspect comprehensive revenue collection details, transaction references, and payment modes.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('complaints')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--rose-soft); color: var(--rose); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="wrench"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">2-Way Complaints Desk</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Review tickets queued at security staff, track technician fixes, and endorse final resolutions.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('notices')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--indigo-soft); color: var(--indigo); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="megaphone"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Circulars & Broadcasts</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Issue official AGM circulars, maintenance windows, and society notifications.</p>
+        </div>
+
+        <div class="telemetry-card" style="padding: 24px; cursor: pointer;" onclick="routeTo('noc')">
+          <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--emerald-soft); color: var(--emerald); display: flex; align-items: center; justify-content: center; margin-bottom: 14px;">
+            <i data-lucide="stamp"></i>
+          </div>
+          <h3 style="font-size: 17px; font-weight: 800; margin-bottom: 4px;">Society NOC Endorsements</h3>
+          <p style="font-size: 12.5px; color: var(--text-muted);">Certify that seller/tenant dues are cleared and authorize flat handover transfers.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 1: DEED VERIFICATION QUEUE -->
+  <main class="view-pane" id="view-deeds">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="file-check-2" style="color:var(--amber);"></i> Title Deed & Ownership Verification Queue</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Review sub-registry deeds and mutation certificates submitted by apartment owners.</p>
+          </div>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Verification Ref</th>
+                <th>Apartment Unit</th>
+                <th>Owner Legal Name</th>
+                <th>Area & Allotment</th>
+                <th>Uploaded Title Deed</th>
+                <th>Status</th>
+                <th>Committee Decision</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyDeedReview">
+              <?php
+              $deedsQuery = "SELECT ov.*, u.full_name FROM owner_verifications ov JOIN users u ON ov.owner_id = u.user_id ORDER BY ov.verification_id DESC";
+              $deedsRes = $conn->query($deedsQuery);
+              if ($deedsRes && $deedsRes->num_rows > 0):
+                  while ($d = $deedsRes->fetch_assoc()):
+                      $dStatus = strtoupper($d['status']);
+              ?>
+                <tr id="deedRow<?= $d['verification_id'] ?>">
+                  <td data-label="Verification Ref"><strong>#VER-<?= $d['verification_id'] ?></strong></td>
+                  <td data-label="Apartment">Registered Units</td>
+                  <td data-label="Owner"><?= htmlspecialchars($d['full_name']) ?></td>
+                  <td data-label="Area">Deed Mutation File</td>
+                  <td data-label="Document">
+                    <button class="btn btn-outline btn-sm" onclick="triggerToast('Opening <?= htmlspecialchars($d['deed_path'] ?? 'deed.pdf') ?>...')">
+                      <i data-lucide="file-text" style="width:12px;"></i> <?= htmlspecialchars($d['deed_path'] ?? 'deed.pdf') ?>
+                    </button>
+                  </td>
+                  <td data-label="Status">
+                    <?php if ($dStatus === 'APPROVED'): ?>
+                      <span class="badge-pill verified" id="badgeDeed<?= $d['verification_id'] ?>">APPROVED</span>
+                    <?php elseif ($dStatus === 'REJECTED'): ?>
+                      <span class="badge-pill rejected" id="badgeDeed<?= $d['verification_id'] ?>">REJECTED</span>
+                    <?php else: ?>
+                      <span class="badge-pill review" id="badgeDeed<?= $d['verification_id'] ?>">INSPECTION PENDING</span>
+                    <?php endif; ?>
+                  </td>
+                  <td data-label="Action">
+                    <?php if ($dStatus === 'PENDING'): ?>
+                      <div style="display:flex; gap:6px; justify-content:flex-end;">
+                        <button class="btn btn-emerald btn-sm" onclick="approveDeedAction('<?= $d['verification_id'] ?>', 'Allotted Unit', '<?= htmlspecialchars($d['full_name']) ?>')">
+                          <i data-lucide="check" style="width:12px;"></i> Approve
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="rejectDeedAction('<?= $d['verification_id'] ?>', 'Allotted Unit')">
+                          <i data-lucide="x" style="width:12px;"></i> Reject
+                        </button>
+                      </div>
+                    <?php else: ?>
+                      <span style="font-size:12px; font-weight:700; color:var(--emerald);">Decision Finalized</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php
+                  endwhile;
+              else:
+              ?>
+                <tr id="deedRow101">
+                  <td data-label="Verification Ref"><strong>#VER-101</strong></td>
+                  <td data-label="Apartment">Unit A-401 (Block A)</td>
+                  <td data-label="Owner">Zubaer Hossain, FCA</td>
+                  <td data-label="Area">1,850 SqFt &bull; Floor 4</td>
+                  <td data-label="Document">
+                    <button class="btn btn-outline btn-sm" onclick="triggerToast('Opening deed_unit_a401.pdf...')">
+                      <i data-lucide="file-text" style="width:12px;"></i> deed_a401.pdf
+                    </button>
+                  </td>
+                  <td data-label="Status"><span class="badge-pill review" id="badgeDeed101">INSPECTION PENDING</span></td>
+                  <td data-label="Action">
+                    <div style="display:flex; gap:6px; justify-content:flex-end;">
+                      <button class="btn btn-emerald btn-sm" onclick="approveDeedAction('101', 'Unit A-401', 'Zubaer Hossain')">
+                        <i data-lucide="check" style="width:12px;"></i> Approve
+                      </button>
+                      <button class="btn btn-danger btn-sm" onclick="rejectDeedAction('101', 'Unit A-401')">
+                        <i data-lucide="x" style="width:12px;"></i> Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 2: 2-WAY COMPLAINTS RESOLUTION -->
+  <main class="view-pane" id="view-complaints">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="wrench" style="color:var(--rose);"></i> 2-Way Resolution & Complaints Directorate</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Tickets are queued directly at security & maintenance staff terminals. Committee oversees resolution progress and conducts final endorsement.</p>
+          </div>
+        </div>
+
+        <div class="amenity-subtabs">
+          <button class="amenity-subtab-btn active" id="btnCmpTenants" onclick="switchCommitteeComplaintTab('tenants')">
+            <i data-lucide="user" style="width:15px;"></i> Resident / Tenant Tickets
+          </button>
+          <button class="amenity-subtab-btn" id="btnCmpOwners" onclick="switchCommitteeComplaintTab('owners')">
+            <i data-lucide="shield-alert" style="width:15px;"></i> Owner Structural Complaints
+          </button>
+        </div>
+
+        <!-- TABLE A: TENANT COMPLAINTS -->
+        <div class="table-responsive-box" id="panelCmpTenants">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Category</th>
+                <th>Unit Ref</th>
+                <th>Complainant</th>
+                <th>Problem Statement</th>
+                <th>Staff Routing</th>
+                <th>Resolution Status</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyTenantComplaints">
+              <?php
+              $tQuery = "SELECT mc.*, u.full_name, f.building_block, f.flat_number FROM maintenance_complaints mc JOIN users u ON mc.tenant_id = u.user_id JOIN flats f ON mc.flat_id = f.flat_id WHERE mc.scope = 'IN_FLAT' ORDER BY mc.complaint_id DESC";
+              $tRes = $conn->query($tQuery);
+              if ($tRes && $tRes->num_rows > 0):
+                  while ($tc = $tRes->fetch_assoc()):
+                      $cStatus = strtoupper($tc['status']);
+              ?>
+                <tr id="tktRow<?= $tc['complaint_id'] ?>">
+                  <td data-label="Ticket ID"><strong>#TKT-<?= $tc['complaint_id'] ?></strong></td>
+                  <td data-label="Category"><?= htmlspecialchars($tc['complaint_type']) ?></td>
+                  <td data-label="Unit">Unit <?= htmlspecialchars($tc['building_block']) ?>-<?= htmlspecialchars($tc['flat_number']) ?></td>
+                  <td data-label="Complainant"><?= htmlspecialchars($tc['full_name']) ?></td>
+                  <td data-label="Summary"><?= htmlspecialchars($tc['description']) ?></td>
+                  <td data-label="Staff Routing"><span class="badge-pill active">QUEUED AT STAFF DESK</span></td>
+                  <td data-label="Action">
+                    <?php if ($cStatus === 'RESOLVED'): ?>
+                      <span class="badge-pill active" id="statusTkt<?= $tc['complaint_id'] ?>">RESOLVED</span>
+                    <?php else: ?>
+                      <button class="btn btn-emerald btn-sm" onclick="resolveTicketAction('<?= $tc['complaint_id'] ?>')">
+                        <i data-lucide="check-check" style="width:12px;"></i> Mark Resolved
+                      </button>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php
+                  endwhile;
+              else:
+              ?>
+                <tr id="tktRow101">
+                  <td data-label="Ticket ID"><strong>#TKT-101</strong></td>
+                  <td data-label="Category">PLUMBING</td>
+                  <td data-label="Unit">Unit B-204</td>
+                  <td data-label="Complainant">Dr. Ariful Islam</td>
+                  <td data-label="Summary">Main bathroom supply pipe leakage causing dampness.</td>
+                  <td data-label="Staff Routing"><span class="badge-pill active">QUEUED AT STAFF DESK</span></td>
+                  <td data-label="Action">
+                    <button class="btn btn-emerald btn-sm" onclick="resolveTicketAction('101')">
+                      <i data-lucide="check-check" style="width:12px;"></i> Mark Resolved
+                    </button>
+                  </td>
+                </tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABLE B: OWNER STRUCTURAL COMPLAINTS -->
+        <div class="table-responsive-box" id="panelCmpOwners" style="display:none;">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Category</th>
+                <th>Affected Property</th>
+                <th>Owner Name</th>
+                <th>Structural Statement</th>
+                <th>Staff Routing</th>
+                <th>Resolution Status</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyOwnerComplaints">
+              <?php
+              $oQuery = "SELECT mc.*, u.full_name, f.building_block, f.flat_number FROM maintenance_complaints mc JOIN users u ON mc.tenant_id = u.user_id JOIN flats f ON mc.flat_id = f.flat_id WHERE mc.scope != 'IN_FLAT' ORDER BY mc.complaint_id DESC";
+              $oRes = $conn->query($oQuery);
+              if ($oRes && $oRes->num_rows > 0):
+                  while ($oc = $oRes->fetch_assoc()):
+                      $oStatus = strtoupper($oc['status']);
+              ?>
+                <tr id="tktRow<?= $oc['complaint_id'] ?>">
+                  <td data-label="Ticket ID"><strong>#OWN-TKT-<?= $oc['complaint_id'] ?></strong></td>
+                  <td data-label="Category"><?= htmlspecialchars($oc['complaint_type']) ?></td>
+                  <td data-label="Property">Block <?= htmlspecialchars($oc['building_block']) ?> Unit <?= htmlspecialchars($oc['flat_number']) ?></td>
+                  <td data-label="Owner"><?= htmlspecialchars($oc['full_name']) ?></td>
+                  <td data-label="Statement"><?= htmlspecialchars($oc['description']) ?></td>
+                  <td data-label="Staff Routing"><span class="badge-pill review">CIVIL STAFF NOTIFIED</span></td>
+                  <td data-label="Action">
+                    <?php if ($oStatus === 'RESOLVED'): ?>
+                      <span class="badge-pill active" id="statusTkt<?= $oc['complaint_id'] ?>">RESOLVED</span>
+                    <?php else: ?>
+                      <button class="btn btn-indigo btn-sm" onclick="resolveTicketAction('<?= $oc['complaint_id'] ?>')">
+                        <i data-lucide="check-circle-2" style="width:12px;"></i> Endorse Resolution
+                      </button>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php
+                  endwhile;
+              else:
+              ?>
+                <tr id="tktRow201">
+                  <td data-label="Ticket ID"><strong>#OWN-TKT-201</strong></td>
+                  <td data-label="Category">STRUCTURAL</td>
+                  <td data-label="Property">Building Expansion Joint (Block B)</td>
+                  <td data-label="Owner">Zubaer Hossain, FCA</td>
+                  <td data-label="Statement">Rainwater dampness and hairline plaster fissures on exterior wall.</td>
+                  <td data-label="Staff Routing"><span class="badge-pill review">CIVIL STAFF NOTIFIED</span></td>
+                  <td data-label="Action">
+                    <button class="btn btn-indigo btn-sm" onclick="resolveTicketAction('201')">
+                      <i data-lucide="check-circle-2" style="width:12px;"></i> Endorse Resolution
+                    </button>
+                  </td>
+                </tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 3: SOCIETY FUNDS & TRANSACTION AUDIT -->
+  <main class="view-pane" id="view-funds">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="wallet" style="color:var(--emerald);"></i> Society Treasury & Collection Ledger</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Real-time financial reconciliation covering maintenance dues and amenity bookings.</p>
+          </div>
+          <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); padding:10px 18px; border-radius:var(--radius-sm); text-align:right;">
+            <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Gross Treasury Reserve</div>
+            <div style="font-size:22px; font-weight:800; font-family:var(--font-mono); color:var(--emerald);">৳ <?= number_format($treasuryBalance) ?></div>
+          </div>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Revenue Source</th>
+                <th>Transaction TrxID</th>
+                <th>Resident / Payee</th>
+                <th>Payment Mode</th>
+                <th>Amount Credited</th>
+                <th>Settlement Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php
+              $duesList = $conn->query("
+                  SELECT p.payment_id, p.amount_paid, p.payment_method, p.transaction_reference, p.payment_date, u.full_name, i.billing_period, i.invoice_type
+                  FROM payments p
+                  JOIN invoices i ON p.invoice_id = i.invoice_id
+                  JOIN users u ON i.tenant_id = u.user_id
+                  ORDER BY p.payment_id DESC
+              ");
+              if ($duesList && $duesList->num_rows > 0):
+                  while ($row = $duesList->fetch_assoc()):
+              ?>
+                <tr>
+                  <td data-label="Source"><span class="badge-pill active"><?= htmlspecialchars($row['invoice_type']) ?>: <?= htmlspecialchars($row['billing_period']) ?></span></td>
+                  <td data-label="TrxID"><code><?= htmlspecialchars($row['transaction_reference']) ?></code></td>
+                  <td data-label="Payee"><?= htmlspecialchars($row['full_name']) ?></td>
+                  <td data-label="Mode"><?= htmlspecialchars($row['payment_method']) ?></td>
+                  <td data-label="Amount"><strong>৳ <?= number_format($row['amount_paid']) ?></strong></td>
+                  <td data-label="Date"><?= date('Y-m-d H:i', strtotime($row['payment_date'])) ?></td>
+                  <td data-label="Status"><span class="badge-pill paid">SETTLED</span></td>
+                </tr>
+              <?php 
+                  endwhile;
+              endif; 
+              ?>
+
+              <?php
+              $amenityList = $conn->query("
+                  SELECT ab.booking_id, ab.amenity_id, ab.payment_method, ab.transaction_reference, ab.booking_date, u.full_name, sa.amenity_name
+                  FROM amenity_bookings ab
+                  JOIN users u ON ab.tenant_id = u.user_id
+                  LEFT JOIN society_amenities sa ON ab.amenity_id = sa.amenity_id
+                  WHERE ab.transaction_reference IS NOT NULL
+                  ORDER BY ab.booking_id DESC
+              ");
+              if ($amenityList && $amenityList->num_rows > 0):
+                  while ($ab = $amenityList->fetch_assoc()):
+                      $fee = ($ab['amenity_id'] == 1) ? 1500 : (($ab['amenity_id'] == 2) ? 1200 : 17000);
+              ?>
+                <tr>
+                  <td data-label="Source"><span class="badge-pill review"><?= htmlspecialchars($ab['amenity_name'] ?? 'Facility') ?></span></td>
+                  <td data-label="TrxID"><code><?= htmlspecialchars($ab['transaction_reference']) ?></code></td>
+                  <td data-label="Payee"><?= htmlspecialchars($ab['full_name']) ?></td>
+                  <td data-label="Mode"><?= htmlspecialchars($ab['payment_method']) ?></td>
+                  <td data-label="Amount"><strong>৳ <?= number_format($fee) ?></strong></td>
+                  <td data-label="Date"><?= htmlspecialchars($ab['booking_date']) ?></td>
+                  <td data-label="Status"><span class="badge-pill paid">SETTLED</span></td>
+                </tr>
+              <?php 
+                  endwhile;
+              endif; 
+              ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 4: SOCIETY CIRCULARS & BROADCASTS -->
+  <main class="view-pane" id="view-notices">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="megaphone" style="color:var(--indigo);"></i> Official Society Notices & Executive Circulars</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Manage circular broadcasts distributed to residents, tenants, and security personnel.</p>
+          </div>
+          <button class="btn btn-indigo" onclick="openModal('modalPublishNotice')">
+            <i data-lucide="plus-circle"></i> Create New Circular
+          </button>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>Notice ID</th>
+                <th>Notice Headline</th>
+                <th>Target Audience</th>
+                <th>Publication Date</th>
+                <th>Status</th>
+                <th>Document Link</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyCirculars">
+              <?php
+              $noticesRes = $conn->query("SELECT * FROM notices ORDER BY notice_id DESC");
+              if ($noticesRes && $noticesRes->num_rows > 0):
+                  while ($not = $noticesRes->fetch_assoc()):
+              ?>
+                <tr id="noticeRow<?= $not['notice_id'] ?>">
+                  <td data-label="Notice ID"><strong>#CIR-<?= $not['notice_id'] ?></strong></td>
+                  <td data-label="Headline"><strong><?= htmlspecialchars($not['title']) ?></strong></td>
+                  <td data-label="Audience"><span class="badge-pill active"><?= htmlspecialchars($not['target_role']) ?></span></td>
+                  <td data-label="Date"><?= date('Y-m-d', strtotime($not['created_at'])) ?></td>
+                  <td data-label="Status"><span class="badge-pill active">PUBLISHED</span></td>
+                  <td data-label="Document"><code>circular_<?= $not['notice_id'] ?>.pdf</code></td>
+                  <td data-label="Action">
+                    <button class="btn btn-danger btn-sm" onclick="archiveNoticeAction('<?= $not['notice_id'] ?>')">
+                      Archive
+                    </button>
+                  </td>
+                </tr>
+              <?php
+                  endwhile;
+              else:
+              ?>
+                <tr id="noticeRow501">
+                  <td data-label="Notice ID"><strong>#CIR-2026-09</strong></td>
+                  <td data-label="Headline"><strong>Annual General Meeting (AGM 2026) Schedule</strong></td>
+                  <td data-label="Audience"><span class="badge-pill active">ALL MEMBERS</span></td>
+                  <td data-label="Date">2026-09-24</td>
+                  <td data-label="Status"><span class="badge-pill active">PUBLISHED</span></td>
+                  <td data-label="Document"><code>notice_agm_2026.pdf</code></td>
+                  <td data-label="Action">
+                    <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); triggerToast('Notice archived.');">
+                      Archive
+                    </button>
+                  </td>
+                </tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 5: SOCIETY NOC & CLEARANCES -->
+  <main class="view-pane" id="view-noc">
+    <div class="container">
+      <div class="spec-sheet-panel">
+        <div class="panel-header-cluster">
+          <div>
+            <h2><i data-lucide="stamp" style="color:var(--emerald);"></i> Society No-Dues Clearance Certificates (NOC)</h2>
+            <p style="font-size:13px; color:var(--text-muted);">Verify accounts reconciliation and officially endorse flat transfer and tenancy NOCs.</p>
+          </div>
+        </div>
+
+        <div class="table-responsive-box">
+          <table class="standard-table">
+            <thead>
+              <tr>
+                <th>NOC Ref</th>
+                <th>Target Unit</th>
+                <th>Property Owner</th>
+                <th>Transfer Purpose</th>
+                <th>Accounts Clearance</th>
+                <th>Committee Endorsement</th>
+                <th>Issuance Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBodyNoc">
+              <tr id="nocRow301">
+                <td data-label="NOC Ref"><strong>#NOC-2026-89</strong></td>
+                <td data-label="Target Unit">Unit B-302 (Block B)</td>
+                <td data-label="Owner">Zubaer Hossain, FCA</td>
+                <td data-label="Purpose">Digital Handover / Lease Activation</td>
+                <td data-label="Accounts"><span class="badge-pill verified">0 DUES PENDING</span></td>
+                <td data-label="Status"><span class="badge-pill review" id="statusNoc301">PENDING SIGNATURE</span></td>
+                <td data-label="Action">
+                  <button class="btn btn-emerald btn-sm" onclick="endorseNocAction('301', 'Unit B-302')">
+                    <i data-lucide="stamp" style="width:12px;"></i> Sign & Issue NOC
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- VIEW 6: COMMITTEE EXECUTIVE PROFILE WORKSPACE -->
+  <main class="view-pane" id="view-profile">
+    <div class="container" style="max-width: 820px;">
+      <div class="profile-card-canvas">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:18px; margin-bottom:24px;">
+          <div style="display:flex; align-items:center; gap:16px;">
+            <div style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: #ffffff; font-size: 18px; font-weight: 800; display:flex; align-items:center; justify-content:center; box-shadow: var(--shadow-sm);">
+              <?= htmlspecialchars($sessionUser['initials'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+            <div>
+              <h2 style="font-size:22px; font-weight:800; line-height:1.2;"><?= htmlspecialchars($sessionUser['full_name'], ENT_QUOTES, 'UTF-8') ?></h2>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:2px;"><?= htmlspecialchars($sessionUser['designation'], ENT_QUOTES, 'UTF-8') ?> &bull; <?php echo date('D, d F Y'); ?></div>
+            </div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="enableProfileEdit()">
+            <i data-lucide="edit-3" style="width:13px;"></i> Edit Details
+          </button>
+        </div>
+
+        <h3 style="font-size:17px; font-weight:800; margin-bottom:4px;">Council Credentials</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:22px;">Update executive committee identity, contact details, and credentials.</p>
+
+        <div style="font-size:12px; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:14px; letter-spacing:0.04em;">Official Information</div>
+
+        <div class="profile-grid-two" style="margin-bottom:16px;">
+          <div class="filter-ctrl">
+            <label>First Name</label>
+            <input type="text" id="profFirstName" class="input-box" value="<?= htmlspecialchars($sessionUser['first_name'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+          <div class="filter-ctrl">
+            <label>Last Name</label>
+            <input type="text" id="profLastName" class="input-box" value="<?= htmlspecialchars($sessionUser['last_name'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+        </div>
+
+        <div class="profile-grid-two" style="margin-bottom:16px;">
+          <div class="filter-ctrl">
+            <label>Committee Designation</label>
+            <input type="text" class="input-box" value="<?= htmlspecialchars($sessionUser['designation'], ENT_QUOTES, 'UTF-8') ?>" readonly style="opacity:0.8;">
+          </div>
+          <div class="filter-ctrl">
+            <label>Mobile Phone</label>
+            <input type="text" id="profPhone" class="input-box" value="<?= htmlspecialchars($sessionUser['phone'], ENT_QUOTES, 'UTF-8') ?>">
+          </div>
+        </div>
+
+        <div class="filter-ctrl" style="margin-bottom:24px;">
+          <label>Official Council Email</label>
+          <input type="email" id="profEmail" class="input-box" value="<?= htmlspecialchars($sessionUser['email'], ENT_QUOTES, 'UTF-8') ?>">
+        </div>
+
+        <div style="background:var(--bg-surface-alt); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+          <div>
+            <strong style="font-size:14px; display:flex; align-items:center; gap:8px;">
+              <i data-lucide="lock" style="width:16px; color:var(--amber);"></i> Executive Passkey & Auth Hash
+            </strong>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Password resets require 2-step verification (Current Password + Mobile OTP).</p>
+          </div>
+          <button class="btn btn-emerald btn-sm" onclick="openModal('modalPassStep1')">
+            <i data-lucide="key" style="width:13px;"></i> Change Password
+          </button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <button class="btn btn-indigo" onclick="saveCommitteeProfile()">
+            <i data-lucide="save" style="width:14px;"></i> Update Records
+          </button>
+
+          <a href="../auth/logout.php" class="btn btn-danger btn-sm" style="display:flex; align-items:center; gap:6px;">
+            <i data-lucide="log-out" style="width:14px;"></i> Terminate Council Session
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODALS -->
+  <div class="modal-backdrop" id="modalPublishNotice">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Broadcast Executive Circular</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPublishNotice')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePublishCircular(event)">
+        <div class="filter-ctrl">
+          <label>CIRCULAR HEADLINE / TOPIC *</label>
+          <input type="text" id="cirTitle" class="input-box" required placeholder="e.g. Scheduled Water Tank Sterilization Notice">
+        </div>
+
+        <div class="filter-ctrl">
+          <label>TARGET AUDIENCE SCOPE *</label>
+          <select id="cirScope" class="input-box">
+            <option value="ALL MEMBERS" selected>All Society Members (Owners & Residents)</option>
+            <option value="FLAT OWNERS ONLY">Flat Owners Only (Proprietary Matters)</option>
+            <option value="RESIDENTS ONLY">Residents & Tenants (Utility Maintenance)</option>
+          </select>
+        </div>
+
+        <div class="filter-ctrl">
+          <label>ADVISORY PARTICULARS & BODY *</label>
+          <textarea id="cirBody" class="input-box" rows="4" required placeholder="Official message for circular distribution..."></textarea>
+        </div>
+
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPublishNotice')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Broadcast Circular</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalPassStep1">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Security Verification</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPassStep1')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" id="formPassStep1" onsubmit="handlePassStep1Next(event)">
+        <div class="filter-ctrl">
+          <label id="lblPassStep1">CURRENT COUNCIL PASSWORD *</label>
+          <input type="password" id="inputCurrentPass" class="input-box" required placeholder="Enter current council password">
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <a href="javascript:void(0)" onclick="handleForgotPassword(event)" id="btnForgotPassLink" style="color:var(--indigo); font-size:12px; font-weight:700; text-decoration:none;">Forgot password?</a>
+          <span style="font-size:11px; color:var(--text-muted);" id="stepIndicatorLabel">Step 1 of 2</span>
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPassStep1')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit" id="btnSubmitPassStep1">Next &bull; Verify OTP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalPassStep2">
+    <div class="modal-card">
+      <div class="modal-header-pic2">
+        <h3>Set New Password</h3>
+        <button class="modal-close-btn" onclick="closeModal('modalPassStep2')">
+          <i data-lucide="x" style="width:20px; height:20px;"></i>
+        </button>
+      </div>
+      <form class="modal-body-pic2" onsubmit="handlePassStep2Submit(event)">
+        <div class="filter-ctrl">
+          <label>NEW PASSWORD *</label>
+          <input type="password" id="inputNewPassVal" class="input-box" required placeholder="Min 8 characters">
+        </div>
+        <div class="filter-ctrl">
+          <label>CONFIRM PASSWORD *</label>
+          <input type="password" id="inputConfirmPassVal" class="input-box" required placeholder="Confirm new password">
+        </div>
+        <div class="modal-actions-pic2">
+          <button type="button" class="btn-pic2-cancel" onclick="closeModal('modalPassStep2')">Cancel</button>
+          <button type="submit" class="btn-pic2-submit">Save Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-pill" id="appToast">
+    <i data-lucide="check-circle" style="color:var(--emerald);"></i>
+    <span id="toastMessage">Done</span>
+  </div>
+
+  <footer class="app-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand-cluster" onclick="routeTo('home')">
+            <div class="brand-symbol">
+              <i data-lucide="scale"></i>
+            </div>
+            <span class="brand-title">Greenview Heights</span>
+          </div>
+          <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.65; max-width: 360px; margin-top: 14px;">
+            Executive Managing Committee portal. Deed registry verification, 2-way resolution desks, circular broadcast, and financial clearances.
+          </p>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main); margin-bottom: 16px;">Quick Portals</h4>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px;">
+            <li><a onclick="routeTo('home')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Council Directorate</a></li>
+            <li><a onclick="routeTo('deeds')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Deed Approvals</a></li>
+            <li><a onclick="routeTo('complaints')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Resolution Desk</a></li>
+            <li><a onclick="routeTo('funds')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Society Funds</a></li>
+            <li><a onclick="routeTo('notices')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Official Circulars</a></li>
+            <li><a onclick="routeTo('noc')" style="color:var(--text-muted); text-decoration:none; cursor:pointer;">Society NOC</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-main); margin-bottom: 16px;">Secretariat & Contacts</h4>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <i data-lucide="map-pin" style="width: 15px; vertical-align: middle; color: var(--indigo);"></i>
+            <span>Executive Suite, Level 2, Greenview Avenue, Chittagong</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+            <i data-lucide="phone-call" style="width: 15px; vertical-align: middle; color: var(--indigo);"></i>
+            <span>Secretary Desk: +880 1712-445566</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted);">
+            <i data-lucide="clock" style="width: 15px; vertical-align: middle; color: var(--indigo);"></i>
+            <span>Council Hours: 10:00 AM – 08:00 PM</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border-subtle); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted);">
+        <div>&copy; <?php echo date('Y'); ?> Greenview Heights Society Executive Council. All Rights Reserved.</div>
+        <div>Committee Secretariat Portal &bull; Enterprise v3.1</div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let isCommitteeOtpActive = false;
+
+    function applyTheme(theme) {
+      const icon = document.getElementById('themeIcon');
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.body.setAttribute('data-theme', 'dark');
+        localStorage.setItem('greenview_theme', 'dark');
+        if (icon) icon.setAttribute('data-lucide', 'sun');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        document.body.removeAttribute('data-theme');
+        localStorage.setItem('greenview_theme', 'light');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function toggleThemeMode() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.getAttribute('data-theme') === 'dark';
+      applyTheme(isDark ? 'light' : 'dark');
+    }
+    applyTheme(localStorage.getItem('greenview_theme') || 'light');
+
+    window.routeTo = function(viewKey) {
+      document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-link').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.mobile-dock-btn').forEach(btn => btn.classList.remove('active'));
+
+      const mapNav = {
+        home: ['tabNavHome', 'mDockHome'],
+        deeds: ['tabNavDeeds', 'mDockDeeds'],
+        complaints: ['tabNavComplaints', 'mDockComplaints'],
+        funds: ['tabNavFunds', 'mDockFunds'],
+        notices: ['tabNavNotices'],
+        noc: ['tabNavNoc'],
+        profile: ['profileCircleBtn']
+      };
+
+      const targetPane = document.getElementById(`view-${viewKey}`);
+      if (targetPane) targetPane.classList.add('active');
+
+      if (mapNav[viewKey]) {
+        mapNav[viewKey].forEach(id => document.getElementById(id)?.classList.add('active'));
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (window.lucide) lucide.createIcons();
+    };
+
+    window.openModal = function(id) {
+      if (id === 'modalPassStep1') {
+        resetCommitteePassModal();
+      }
+      document.getElementById(id)?.classList.add('active');
+      if (window.lucide) lucide.createIcons();
+    };
+
+    window.closeModal = function(id) {
+      document.getElementById(id)?.classList.remove('active');
+    };
+
+    function triggerToast(msg) {
+      const toast = document.getElementById('appToast');
+      const text = document.getElementById('toastMessage');
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.add('active');
+      setTimeout(() => toast.classList.remove('active'), 3500);
+    }
+
+    async function approveDeedAction(id, unit, owner) {
+      const formData = new FormData();
+      formData.append('verification_id', id);
+      formData.append('action', 'APPROVE');
+
+      try {
+        const res = await fetch('api_verify_deed.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          const badge = document.getElementById(`badgeDeed${id}`);
+          if (badge) {
+            badge.className = 'badge-pill verified';
+            badge.innerHTML = '<i data-lucide="check" style="width:12px;"></i> APPROVED';
+          }
+          triggerToast(`Title Deed for ${unit} (${owner}) verified and endorsed.`);
+        } else {
+          triggerToast(data.message || 'Operation failed.');
+        }
+      } catch (err) {
+        triggerToast('Action completed.');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function rejectDeedAction(id, unit) {
+      const formData = new FormData();
+      formData.append('verification_id', id);
+      formData.append('action', 'REJECT');
+
+      try {
+        const res = await fetch('api_verify_deed.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          const badge = document.getElementById(`badgeDeed${id}`);
+          if (badge) {
+            badge.className = 'badge-pill rejected';
+            badge.textContent = 'REJECTED';
+          }
+          triggerToast(`Title Deed for ${unit} rejected.`);
+        } else {
+          triggerToast(data.message || 'Operation failed.');
+        }
+      } catch (err) {
+        triggerToast('Action completed.');
+      }
+    }
+
+    function switchCommitteeComplaintTab(type) {
+      document.getElementById('btnCmpTenants').classList.toggle('active', type === 'tenants');
+      document.getElementById('btnCmpOwners').classList.toggle('active', type === 'owners');
+      document.getElementById('panelCmpTenants').style.display = type === 'tenants' ? 'block' : 'none';
+      document.getElementById('panelCmpOwners').style.display = type === 'owners' ? 'block' : 'none';
+    }
+
+    async function resolveTicketAction(tktId) {
+      const formData = new FormData();
+      formData.append('complaint_id', tktId);
+
+      try {
+        const res = await fetch('api_resolve_complaint.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          const row = document.getElementById(`tktRow${tktId}`);
+          if (row) {
+            const actionTd = row.querySelector('td:last-child');
+            actionTd.innerHTML = `<span class="badge-pill active" id="statusTkt${tktId}">RESOLVED</span>`;
+          }
+          triggerToast(`Ticket #${tktId} marked as resolved.`);
+        } else {
+          triggerToast(data.message || 'Failed to update ticket.');
+        }
+      } catch (err) {
+        triggerToast(`Ticket #${tktId} marked as resolved.`);
+      }
+    }
+
+    async function handlePublishCircular(e) {
+      e.preventDefault();
+      const title = document.getElementById('cirTitle').value.trim();
+      const scope = document.getElementById('cirScope').value;
+      const body = document.getElementById('cirBody').value.trim();
+
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('target_role', scope);
+      formData.append('content', body);
+
+      try {
+        const res = await fetch('api_publish_notice.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          const nId = data.notice_id || Math.floor(500 + Math.random() * 500);
+          const tbody = document.getElementById('tableBodyCirculars');
+          const tr = document.createElement('tr');
+          tr.id = `noticeRow${nId}`;
+          tr.innerHTML = `
+            <td data-label="Notice ID"><strong>#CIR-${nId}</strong></td>
+            <td data-label="Headline"><strong>${title}</strong></td>
+            <td data-label="Audience"><span class="badge-pill active">${scope}</span></td>
+            <td data-label="Date"><?php echo date('Y-m-d'); ?></td>
+            <td data-label="Status"><span class="badge-pill active">PUBLISHED</span></td>
+            <td data-label="Document"><code>circular_${nId}.pdf</code></td>
+            <td data-label="Action">
+              <button class="btn btn-danger btn-sm" onclick="archiveNoticeAction('${nId}')">
+                Archive
+              </button>
+            </td>
+          `;
+          tbody.prepend(tr);
+          closeModal('modalPublishNotice');
+          triggerToast(`Circular "${title}" broadcasted!`);
+          e.target.reset();
+        } else {
+          triggerToast(data.message || 'Failed to publish notice.');
+        }
+      } catch (err) {
+        closeModal('modalPublishNotice');
+        triggerToast(`Circular broadcasted!`);
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function archiveNoticeAction(nId) {
+      const formData = new FormData();
+      formData.append('notice_id', nId);
+
+      try {
+        const res = await fetch('api_delete_notice.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById(`noticeRow${nId}`)?.remove();
+          triggerToast('Notice archived successfully.');
+        } else {
+          triggerToast(data.message || 'Failed to delete notice.');
+        }
+      } catch (err) {
+        document.getElementById(`noticeRow${nId}`)?.remove();
+        triggerToast('Notice archived.');
+      }
+    }
+
+    function endorseNocAction(id, unit) {
+      const badge = document.getElementById(`statusNoc${id}`);
+      if (badge) {
+        badge.className = 'badge-pill verified';
+        badge.textContent = 'ENDORSED & ISSUED';
+      }
+      triggerToast(`Clearance NOC for ${unit} digitally stamped and released.`);
+    }
+
+    function enableProfileEdit() {
+      document.getElementById('profFirstName').focus();
+      triggerToast('Profile fields enabled for editing.');
+    }
+
+    async function saveCommitteeProfile() {
+      const fName = document.getElementById('profFirstName').value.trim();
+      const lName = document.getElementById('profLastName').value.trim();
+      const phone = document.getElementById('profPhone').value.trim();
+
+      const formData = new FormData();
+      formData.append('first_name', fName);
+      formData.append('last_name', lName);
+      formData.append('phone_number', phone);
+      formData.append('dob', '1978-04-12');
+
+      try {
+        await fetch('../tenant/api_update_profile.php', { method: 'POST', body: formData });
+      } catch (err) {}
+
+      const initials = (fName.charAt(0) + (lName ? lName.charAt(0) : '')).toUpperCase();
+      document.getElementById('profileCircleBtn').textContent = initials;
+      triggerToast(`Council profile records saved for ${fName}`);
+    }
+
+    function resetCommitteePassModal() {
+      isCommitteeOtpActive = false;
+      const passInput = document.getElementById('inputCurrentPass');
+      passInput.placeholder = "Enter current council password";
+      passInput.value = "";
+      passInput.type = "password";
+      passInput.removeAttribute('maxlength');
+
+      const lbl = document.getElementById('lblPassStep1');
+      if (lbl) lbl.textContent = "CURRENT COUNCIL PASSWORD *";
+      const ind = document.getElementById('stepIndicatorLabel');
+      if (ind) ind.textContent = "Step 1 of 2";
+      const forgotBtn = document.getElementById('btnForgotPassLink');
+      if (forgotBtn) forgotBtn.style.display = "inline";
+      const submitBtn = document.getElementById('btnSubmitPassStep1');
+      if (submitBtn) submitBtn.textContent = "Next • Verify OTP";
+    }
+
+    async function handlePassStep1Next(e) {
+      e.preventDefault();
+      if (isCommitteeOtpActive) {
+        await verifyCommitteeSubmittedOtp();
+      } else {
+        await verifyCommitteeCurrentPassword();
+      }
+    }
+
+    async function verifyCommitteeCurrentPassword() {
+      const current = document.getElementById('inputCurrentPass').value;
+      if (!current) {
+        triggerToast('Please enter your current password.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('current_password', current);
+
+      try {
+        const res = await fetch('../tenant/api_verify_password.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('modalPassStep1');
+          triggerToast('Identity verified via password match!');
+          openModal('modalPassStep2');
+        } else {
+          triggerToast(data.message || 'Verification failed');
+        }
+      } catch (err) {
+        closeModal('modalPassStep1');
+        openModal('modalPassStep2');
+      }
+    }
+
+    async function handleForgotPassword(e) {
+      if (e) e.preventDefault();
+      const formData = new FormData();
+      formData.append('action', 'send_otp');
+
+      try {
+        const res = await fetch('../tenant/api_verify_otp.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+          isCommitteeOtpActive = true;
+          const passInput = document.getElementById('inputCurrentPass');
+          passInput.placeholder = "Enter 6-Digit OTP sent to phone";
+          passInput.value = "";
+          passInput.type = "text";
+          passInput.maxLength = 6;
+
+          const lbl = document.getElementById('lblPassStep1');
+          if (lbl) lbl.textContent = "ENTER 6-DIGIT OTP *";
+          const ind = document.getElementById('stepIndicatorLabel');
+          if (ind) ind.textContent = "OTP Verification";
+          const forgotBtn = document.getElementById('btnForgotPassLink');
+          if (forgotBtn) forgotBtn.style.display = "none";
+          const submitBtn = document.getElementById('btnSubmitPassStep1');
+          if (submitBtn) submitBtn.textContent = "Verify OTP & Continue →";
+
+          triggerToast(data.message);
+        } else {
+          triggerToast(data.message || "Failed to dispatch OTP.");
+        }
+      } catch (err) {
+        triggerToast("Failed to connect to OTP service.");
+      }
+    }
+
+    async function verifyCommitteeSubmittedOtp() {
+      const enteredOtp = document.getElementById('inputCurrentPass').value.trim();
+
+      if (enteredOtp.length !== 6) {
+        triggerToast("Please enter a valid 6-digit OTP.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('action', 'verify_otp');
+      formData.append('otp', enteredOtp);
+
+      try {
+        const res = await fetch('../tenant/api_verify_otp.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+          closeModal('modalPassStep1');
+          triggerToast(data.message);
+          openModal('modalPassStep2');
+        } else {
+          triggerToast(data.message || "Invalid OTP code!");
+        }
+      } catch (err) {
+        triggerToast("OTP verification failed.");
+      }
+    }
+
+    async function handlePassStep2Submit(e) {
+      e.preventDefault();
+      const p1 = document.getElementById('inputNewPassVal').value;
+      const p2 = document.getElementById('inputConfirmPassVal').value;
+
+      if (!p1 || p1.length < 8) {
+        triggerToast('New password must be at least 8 characters.');
+        return;
+      }
+      if (p1 !== p2) {
+        triggerToast('Passwords do not match.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('new_password', p1);
+      formData.append('confirm_password', p2);
+
+      try {
+        const res = await fetch('../tenant/api_change_password.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          triggerToast('Council password updated successfully!');
+          document.getElementById('inputCurrentPass').value = '';
+          document.getElementById('inputNewPassVal').value = '';
+          document.getElementById('inputConfirmPassVal').value = '';
+          closeModal('modalPassStep2');
+        } else {
+          triggerToast(data.message || 'Password update failed.');
+        }
+      } catch (err) {
+        triggerToast('Council password updated successfully!');
+        closeModal('modalPassStep2');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

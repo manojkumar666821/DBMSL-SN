@@ -1,0 +1,158 @@
+Bro, eikhane ekta fundamental rule mone rakhte hobe: **Browser konodin `.html` file-er bhetore thaka `<?php ... ?>` code execute korte pare na.**
+
+Tumi jodi file-tar extension `.html` rakho (`guest_portal.html`), tobe PHP code execute na hoye raw text hishebe theke jabe ba completely ignore hobe.
+
+Kintu tumi jodi **pure `.html**` hishebei file ta rakhte chao, tobe oi PHP session part-ta **HTML file theke shoriye dite hobe** ebong tar bodole **JavaScript diye dynamic korte hobe**.
+
+Eita shundor vabe korar **2-ta standard way** ache:
+
+---
+
+### Method 1: File ke `.php` banano (Shobcheye Shohoj & Recommended)
+
+Tomar file-tar name `guest_portal.html`-er jaygay shudhu rename kore **`guest_portal.php`** kore dao।
+
+* File-ti thakbe `guest_dashboard/guest_portal.php`।
+
+
+* Browser-e run korba: `http://localhost/DBMSL%20PROJECT/guest_dashboard/guest_portal.php`।
+
+
+* Tahole uporer `<?php session_start(); ... ?>` ekdom top-ei boshe thakbe ebong automatic server theke logged-in user data inject hobe.
+
+---
+
+### Method 2: Jodi strictly `.html` file-i rakhte hoy
+
+Jodi file-ti strictly `guest_portal.html` hishebei rakhte hoy, tobe file theke **shob PHP tag (`<?php ... ?>`) completely muche felte hobe**.
+
+Tar bodole:
+
+1. Ekta tiny API endpoint thakbe session check korar jonno: `get_session_user.php`
+2. `guest_portal.html` load howar por JavaScript `fetch('get_session_user.php')` call kore user data niye ashbe ebong navbar & profile card-e boshay dibe।
+
+
+
+#### Step A: PHP Session API banano (`guest_dashboard/get_session_user.php`)
+
+Ei file-ti create koro:
+
+```php
+<?php
+// guest_dashboard/get_session_user.php
+session_start();
+header('Content-Type: application/json');
+
+$sessionUser = [
+    'is_logged_in' => isset($_SESSION['user_id']),
+    'user_id'      => $_SESSION['user_id'] ?? 101,
+    'full_name'    => $_SESSION['full_name'] ?? 'Manojkumar Chowdhury',
+    'email'        => $_SESSION['email'] ?? 'guest.visitor@greenview.internal',
+    'phone'        => $_SESSION['phone_number'] ?? '+880 1812-345678',
+    'role_id'      => $_SESSION['role_id'] ?? 1,
+    'role_name'    => $_SESSION['role_name'] ?? 'GUEST'
+];
+
+echo json_encode(["success" => true, "user" => $sessionUser]);
+?>
+
+```
+
+#### Step B: `guest_portal.html`-e ja change korba
+
+1. File-er shurur `<?php ... ?>` part ta **delete** kore dao.
+2. Navbar-er profile button ebong profile view-te jekhane `<?= ... ?>` chilo, shekhane normal placeholder/IDs dao:
+
+```html
+<!-- Top Right Avatar Button in guest_portal.html -->
+<button class="profile-circle-btn" id="profileCircleBtn" title="My Profile" onclick="routeTo('profile')">
+  M
+</button>
+
+<!-- Auth Actions Container -->
+<div id="authButtonsContainer">
+  <a href="../auth/login.php" class="btn btn-outline btn-sm">Sign In</a>
+  <a href="../auth/login.php?mode=register" class="btn btn-dark btn-sm">Register</a>
+</div>
+
+```
+
+Profile section-e:
+
+```html
+<div class="profile-avatar-large" id="profAvatarLarge">M</div>
+<div class="profile-title-cluster">
+  <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <h1 style="font-size: 24px; font-weight: 800;" id="profHeroName">Manojkumar Chowdhury</h1>
+    <span class="kyc-badge-pill verified"><i data-lucide="shield-check" style="width: 13px;"></i> Level-1 Verified Guest</span>
+  </div>
+  <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;" id="profHeroSub">
+    guest.visitor@greenview.internal &bull; +880 1812-345678
+  </p>
+</div>
+
+```
+
+#### Step C: JavaScript Controller-e Session Loader add kora
+
+Tomar `<script>` tag-er bhetore eita add koro:
+
+```javascript
+async function loadSessionUser() {
+  try {
+    const res = await fetch('get_session_user.php');
+    const data = await res.json();
+    if (data.success) {
+      const user = data.user;
+      
+      // Update Top Nav Avatar
+      const initial = user.full_name ? user.full_name.charAt(0).toUpperCase() : 'G';
+      const circleBtn = document.getElementById('profileCircleBtn');
+      if (circleBtn) circleBtn.textContent = initial;
+
+      // Update Auth Buttons visibility
+      const authBox = document.getElementById('authButtonsContainer');
+      if (authBox) {
+        authBox.style.display = user.is_logged_in ? 'none' : 'flex';
+      }
+
+      // Update Profile View Details
+      const avatarLarge = document.getElementById('profAvatarLarge');
+      if (avatarLarge) avatarLarge.textContent = initial;
+
+      const heroName = document.getElementById('profHeroName');
+      if (heroName) heroName.textContent = user.full_name;
+
+      const heroSub = document.getElementById('profHeroSub');
+      if (heroSub) heroSub.textContent = `${user.email} • ${user.phone}`;
+
+      const nameInput = document.getElementById('profName');
+      if (nameInput) nameInput.value = user.full_name;
+
+      const emailInput = document.getElementById('profEmail');
+      if (emailInput) emailInput.value = user.email;
+
+      const phoneInput = document.getElementById('profPhone');
+      if (phoneInput) phoneInput.value = user.phone;
+    }
+  } catch (err) {
+    console.error("Failed to load user session:", err);
+  }
+}
+
+// Dom ready hole call hobe
+document.addEventListener('DOMContentLoaded', () => {
+  loadSessionUser();
+  fetchLiveFlats();
+});
+
+```
+
+---
+
+### Verdict
+
+* **Shohoj & Clean approach:** File extension-ke shudhu `.html` theke `.php` kore deya (`guest_portal.php`)। Ete extra API call lagena, direct page render hoy।
+
+
+* **Jodi strictly `.html` rakhte hoy:** Uporer **Method 2** use koro, jekhane JS diye session fetch kore dynamic kora hoyeche।
