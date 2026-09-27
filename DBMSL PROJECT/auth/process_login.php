@@ -37,7 +37,16 @@ if ($row = $result->fetch_assoc()) {
 
         $role = (int)$row['role_id'];
 
-        if ($role === 4) {
+        // Role 6: Super Admin / Sysadmin (FIXED HERE)
+        if ($role === 6) {
+            $_SESSION['user_role'] = 'ADMIN';
+            header("Location: ../admin/admin_dashboard.php");
+            exit();
+        } elseif ($role === 5) {
+            $_SESSION['user_role'] = 'STAFF';
+            header("Location: ../staff/staff_dashboard.php");
+            exit();
+        } elseif ($role === 4) {
             $_SESSION['user_role'] = 'COMMITTEE';
             header("Location: ../committee/committee_dashboard.php");
             exit();
@@ -61,3 +70,4 @@ $stmt->close();
 $conn->close();
 header("Location: auth.php?error=" . urlencode("Invalid credentials entered."));
 exit();
+?>

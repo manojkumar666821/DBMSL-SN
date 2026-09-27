@@ -69,9 +69,9 @@ $stmt->close();
 
 // 6. Secure Password Hashing
 $password_hash = password_hash($password, PASSWORD_BCRYPT);
-$is_verified   = 1; // Instant access enable
+$is_verified   = 1;
 
-// 7. Insert into Core Users Table (ড্রপ করা টেবিল ছাড়াই সরাসরি users টেবিলে)
+// 7. Insert into Core Users Table
 $insert = $conn->prepare("INSERT INTO users (role_id, full_name, email, phone_number, password_hash, is_verified) VALUES (?, ?, ?, ?, ?, ?)");
 $insert->bind_param("issssi", $role_id, $full_name, $email, $phone_number, $password_hash, $is_verified);
 
@@ -86,8 +86,11 @@ if ($insert->execute()) {
     $_SESSION['phone_number'] = $phone_number;
     $_SESSION['role_id']      = $role_id;
 
-    // 9. Role-Specific Direct Redirection (গেস্টে ফোর্স করা লাইন বাদ দেওয়া হয়েছে)
-    if ($role_id === 3) {
+    // 9. Role-Specific Direct Redirection
+    if ($role_id === 5) {
+        $_SESSION['user_role'] = 'STAFF';
+        header("Location: ../staff/staff_dashboard.php");
+    } elseif ($role_id === 3) {
         $_SESSION['user_role'] = 'FLAT_OWNER';
         header("Location: ../owner/owner_dashboard.php");
     } elseif ($role_id === 2) {
